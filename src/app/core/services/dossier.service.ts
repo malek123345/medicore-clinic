@@ -1,57 +1,110 @@
-import { Injectable, signal } from '@angular/core';
+// dossier.service.ts
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 export interface Ordonnance {
-  id: string; patientId: string; patientName: string; date: string;
+  id: number; // ✅ تبديل من string إلى number
+  patientId: string;
+  patientName: string;
+  date: string;
   doctorName: string;
   medications: { name: string; dose: string; freq: string; duree: string }[];
-  notes?: string; createdAt: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface MedicalFile {
-  id: string; patientId: string; name: string;
+  id: string;
+  patientId: string;
+  name: string;
   type: 'scanner' | 'pdf' | 'image' | 'document';
-  size: string; uploadedAt: string; uploadedBy: 'patient' | 'doctor';
+  size: string;
+  uploadedAt: string;
+  uploadedBy: 'patient' | 'doctor';
   dataUrl?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class DossierService {
-  private _ordonnances = signal<Ordonnance[]>([
-    { id:'ORD001', patientId:'P001', patientName:'Karim Ayoub',  date:'2026-04-12', doctorName:'Dr. Zied Khaddar', createdAt:'2026-04-12',
-      medications:[{ name:'Amoxicilline',dose:'500mg',freq:'3×/jour',duree:'7 jours' },{ name:'Ibuprofène',dose:'400mg',freq:'2×/jour',duree:'5 jours' }], notes:'À prendre après les repas.' },
-    { id:'ORD002', patientId:'P001', patientName:'Karim Ayoub',  date:'2026-03-05', doctorName:'Dr. Zied Khaddar', createdAt:'2026-03-05',
-      medications:[{ name:'Chlorhexidine 0.12%',dose:'Bain de bouche',freq:'2×/jour',duree:'14 jours' }], notes:'Ne pas manger 30 min après.' },
-    { id:'ORD003', patientId:'P002', patientName:'Sana Ben Ali', date:'2026-04-10', doctorName:'Dr. Zied Khaddar', createdAt:'2026-04-10',
-      medications:[{ name:'Métronidazole',dose:'250mg',freq:'3×/jour',duree:'7 jours' },{ name:'Paracétamol',dose:'1000mg',freq:'si douleur',duree:'5 jours' }] },
-  ]);
+  private http = inject(HttpClient);
+  private readonly API = `${environment.apiUrl}/ordonnances`;
 
-  private _files = signal<MedicalFile[]>([
-    { id:'F001', patientId:'P001', name:'Panoramique_Dental_2026.pdf', type:'scanner', size:'2.4 MB', uploadedAt:'2026-04-12', uploadedBy:'doctor' },
-    { id:'F002', patientId:'P001', name:'Radio_periapicale.jpg',       type:'image',   size:'850 KB', uploadedAt:'2026-03-05', uploadedBy:'doctor' },
-    { id:'F003', patientId:'P002', name:'Bilan_paro_sana.pdf',         type:'pdf',     size:'1.1 MB', uploadedAt:'2026-04-10', uploadedBy:'patient' },
-  ]);
+  // ✅ تحميل من Backend
+  private _ordonnances = signal<Ordonnance[]>([]);
+  private _files = signal<MedicalFile[]>([]);
 
   readonly ordonnances = this._ordonnances.asReadonly();
-  readonly files       = this._files.asReadonly();
+  readonly files = this._files.asReadonly();
 
-  getOrdonnancesForPatient(id: string) { return this._ordonnances().filter(o => o.patientId === id); }
-  getFilesForPatient(id: string)       { return this._files().filter(f => f.patientId === id); }
+  constructor() {
+    this.loadOrdonnances();
+  }
+
+  // ✅ تحميل من Backend
+  loadOrdonnances() {
+    this.http.get<Ordonnance[]>(this.API).subscribe(res => {
+      this._ordonnances.set(res);
+    });
+  }
+
+  getOrdonnancesForPatient(id: string) {
+    return this._ordonnances().filter(o => o.patientId === id);
+  }
+
+  getFilesForPatient(id: string) {
+    return this._files().filter(f => f.patientId === id);
+  }
 
   searchOrdonnances(q: string): Ordonnance[] {
     const low = q.toLowerCase();
     return this._ordonnances().filter(o =>
-      o.patientName.toLowerCase().includes(low) || o.id.toLowerCase().includes(low) || o.date.includes(low)
+      o.patientName.toLowerCase().includes(low) ||
+      String(o.id).includes(low) ||
+      o.date.includes(low)
     );
   }
 
-  addOrdonnance(ord: Omit<Ordonnance,'id'|'createdAt'>): Ordonnance {
-    const newOrd: Ordonnance = { ...ord, id:'ORD'+Date.now(), createdAt: new Date().toISOString().slice(0,10) };
-    this._ordonnances.update(l => [newOrd, ...l]);
-    return newOrd;
+  // ✅ إضافة إلى Backend
+  addOrdonnance(ord: Omit<Ordonnance, 'id' | 'createdAt'>): void {
+    const payload = {
+      patientId: ord.patientId,
+      patientName: ord.patientName,
+      date: ord.date,
+      doctor: ord.doctorName,
+      meds: ord.medications.map(m => ({
+        name: m.name,
+        dose: m.dose,
+        freq: m.freq,
+        duree: m.duree
+      })),
+      // ✅ إضافة الحقول المطلوبة في Backend
+      diag: ord.notes || '',
+      medication: ord.medications[0]?.name || '',
+      dosage: ord.medications[0]?.dose || '',
+      frequency: ord.medications[0]?.freq || '',
+      duration: ord.medications[0]?.duree || '',
+      instructions: ord.notes || '',
+      status: 'active'
+    };
+
+    this.http.post<Ordonnance>(this.API, payload).subscribe(res => {
+      this._ordonnances.update(l => [res, ...l]);
+    });
   }
 
-  addFile(file: Omit<MedicalFile,'id'>): void {
-    this._files.update(l => [{ ...file, id:'F'+Date.now() }, ...l]);
+  // ✅ حذف من Backend
+  deleteOrdonnance(id: number): void {
+    this.http.delete(`${this.API}/${id}`).subscribe(() => {
+      this._ordonnances.update(l => l.filter(o => o.id !== id));
+    });
   }
-  deleteFile(id: string): void { this._files.update(l => l.filter(f => f.id !== id)); }
+
+  addFile(file: Omit<MedicalFile, 'id'>): void {
+    this._files.update(l => [{ ...file, id: 'F' + Date.now() }, ...l]);
+  }
+
+  deleteFile(id: string): void {
+    this._files.update(l => l.filter(f => f.id !== id));
+  }
 }

@@ -1,70 +1,313 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable, of, firstValueFrom } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
+
+// ════════════════════════════════════════════════════════════════════════════
+//  INTERFACES
+// ════════════════════════════════════════════════════════════════════════════
 
 export interface Appointment {
-  id: string; patientId: string; patientName: string; patientPhone?: string;
-  date: string; time: string; type: string;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'done'; notes?: string; createdAt: string;
+  id: number;
+  time: string;
+  ap: string;
+  date: string;
+  day: number;
+  mo: string;
+  month: number;
+  year: number;
+  av?: string;
+  avGrad?: string;
+  patientName: string;
+  patientAvatar?: string;
+  patientAvatarColor?: string;
+  patientAge?: string;
+  patientId?: string;
+  patientPhone?: string;
+  type: string;
+  status: string;
+  statusLbl: string;
+  statusCls: string;
+  createdAt?: string;
 }
+
+export interface CreateAppointmentRequest {
+  patientName: string;
+  patientPhone?: string;
+   patientId?: string;
+  date: string;
+  time: string;
+  type: string;
+  status?: string;
+}
+
+export interface TimeSlot {
+  time: string;
+  label: string;
+  taken: boolean;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SERVICE
+// ════════════════════════════════════════════════════════════════════════════
 
 @Injectable({ providedIn: 'root' })
 export class RdvService {
-  readonly slots = [
-    { time:'08:00', label:'08:00 → 08:45' },
-    { time:'09:00', label:'09:00 → 09:45' },
-    { time:'10:00', label:'10:00 → 10:45' },
-    { time:'11:00', label:'11:00 → 11:45' },
-    { time:'14:00', label:'14:00 → 14:45' },
-    { time:'15:00', label:'15:00 → 15:45' },
-    { time:'16:00', label:'16:00 → 16:45' },
-  ];
+  private http = inject(HttpClient);
+  private readonly API_URL = 'http://localhost:5000/api/appointments';
 
-  private _appointments = signal<Appointment[]>([
-    { id:'RDV001', patientId:'P001', patientName:'Karim Ayoub',  patientPhone:'+216 55 123 456', date:'2026-04-18', time:'09:00', type:'Consultation',  status:'confirmed', createdAt:'2026-04-10' },
-    { id:'RDV002', patientId:'P002', patientName:'Sana Ben Ali', patientPhone:'+216 98 765 432', date:'2026-04-18', time:'10:00', type:'Détartrage',    status:'pending',   createdAt:'2026-04-11' },
-    { id:'RDV003', patientId:'P001', patientName:'Karim Ayoub',  patientPhone:'+216 55 123 456', date:'2026-04-22', time:'14:00', type:'Implant',        status:'confirmed', createdAt:'2026-04-10' },
-    { id:'RDV004', patientId:'P002', patientName:'Sana Ben Ali', patientPhone:'+216 98 765 432', date:'2026-04-14', time:'08:00', type:'Suivi',          status:'done',      createdAt:'2026-04-08' },
-    { id:'RDV005', patientId:'P001', patientName:'Karim Ayoub',  patientPhone:'+216 55 123 456', date:'2026-04-16', time:'11:00', type:'Détartrage',    status:'done',      createdAt:'2026-04-05' },
-  ]);
+  // ══════════════════════════════════════════════════════════════════════════
+  //  HELPERS
+  // ══════════════════════════════════════════════════════════════════════════
 
-  readonly appointments = this._appointments.asReadonly();
-
-  isSunday(date: string): boolean { return new Date(date).getDay() === 0; }
-
-  isSlotTaken(date: string, time: string): boolean {
-    return this._appointments().some(a => a.date === date && a.time === time && a.status !== 'cancelled');
-  }
-
-  getAvailableSlots(date: string): { time: string; label: string; taken: boolean }[] {
-    if (this.isSunday(date)) return [];
-    return this.slots.map(s => ({ ...s, taken: this.isSlotTaken(date, s.time) }));
-  }
-
-  bookAppointment(appt: Omit<Appointment, 'id' | 'createdAt'>): { success: boolean; message: string } {
-    if (this.isSunday(appt.date)) return { success: false, message: 'Le cabinet est fermé le dimanche.' };
-    if (this.isSlotTaken(appt.date, appt.time)) {
-      return { success: false, message: 'Ce temps est déjà réservé, veuillez choisir un autre temps.' };
+  private getHeaders(): HttpHeaders {
+    const token = localStorage.getItem('auth_token');
+    let headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Accept': '*/*'
+    });
+    
+    if (token) {
+      headers = headers.set('Authorization', `Bearer ${token}`);
     }
-    this._appointments.update(l => [
-      ...l,
-      { ...appt, id: 'RDV' + Date.now(), createdAt: new Date().toISOString().slice(0, 10) }
-    ]);
-    return { success: true, message: 'Rendez-vous confirmé avec succès !' };
+    
+    return headers;
   }
 
-  cancelAppointment(id: string): void {
-    this._appointments.update(l => l.map(a => a.id === id ? { ...a, status: 'cancelled' as const } : a));
+  // ══════════════════════════════════════════════════════════════════════════
+  //  CRUD OPERATIONS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get all appointments
+   */
+  getAll(date?: string, month?: number, day?: number): Observable<Appointment[]> {
+    let url = this.API_URL;
+    const params: string[] = [];
+    
+    if (date) params.push(`date=${date}`);
+    if (month) params.push(`month=${month}`);
+    if (day) params.push(`day=${day}`);
+    
+    if (params.length > 0) {
+      url += '?' + params.join('&');
+    }
+
+    return this.http.get<{ data: Appointment[]; total: number }>(url, { headers: this.getHeaders() })
+      .pipe(
+        map(response => response.data || []),
+        catchError(err => {
+          console.error('Get appointments error:', err);
+          return of([]);
+        })
+      );
   }
-  confirmAppointment(id: string): void {
-    this._appointments.update(l => l.map(a => a.id === id ? { ...a, status: 'confirmed' as const } : a));
+
+  /**
+   * Get today's appointments
+   */
+  getToday(): Observable<Appointment[]> {
+    const url = `${this.API_URL}/today`;
+    
+    return this.http.get<Appointment[]>(url, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Get today appointments error:', err);
+          return of([]);
+        })
+      );
   }
-  markAppointmentAsDone(id: string) {
-  const rdvs = this.getAll();
-  const rdv = rdvs.find(r => r.id === id);
-  if (rdv) {
-    rdv.status = 'done';
+
+  /**
+   * Get appointments for a specific patient
+   */
+  getForPatient(patientId: string): Observable<Appointment[]> {
+    if (!patientId) return of([]);
+    
+    const url = `${this.API_URL}/patient/${patientId}`;
+    
+    return this.http.get<Appointment[]>(url, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Get patient appointments error:', err);
+          return of([]);
+        })
+      );
   }
-}
-  getForPatient(patientId: string): Appointment[] { return this._appointments().filter(a => a.patientId === patientId); }
-  getForDate(date: string): Appointment[] { return this._appointments().filter(a => a.date === date); }
-  getAll(): Appointment[] { return this._appointments(); }
+
+  /**
+   * Create new appointment
+   */
+  create(data: CreateAppointmentRequest): Observable<Appointment> {
+    const payload = {
+      ...data,
+      status: data.status || 'pending'
+    };
+
+    return this.http.post<Appointment>(this.API_URL, payload, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Create appointment error:', err);
+          throw err;
+        })
+      );
+  }
+
+  /**
+   * Book appointment (for patients)
+   */
+  async bookAppointment(data: CreateAppointmentRequest): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(this.create(data));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Book appointment error:', err);
+      return { 
+        success: false, 
+        error: err.error?.message || 'Erreur lors de la réservation' 
+      };
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STATUS UPDATES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Confirm appointment
+   */
+  confirmAppointment(id: number): Observable<any> {
+    const url = `${this.API_URL}/${id}/status`;
+    
+    return this.http.put(url, { status: 'confirmed' }, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Confirm appointment error:', err);
+          throw err;
+        })
+      );
+  }
+
+  /**
+   * Mark appointment as done
+   */
+  markAppointmentAsDone(id: number): Observable<any> {
+    const url = `${this.API_URL}/${id}/status`;
+    
+    return this.http.put(url, { status: 'done' }, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Mark as done error:', err);
+          throw err;
+        })
+      );
+  }
+
+  /**
+   * Cancel appointment
+   */
+  cancelAppointment(id: number | string): Observable<any> {
+    const appointmentId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const url = `${this.API_URL}/${appointmentId}/status`;
+    
+    return this.http.put(url, { status: 'cancelled' }, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Cancel appointment error:', err);
+          throw err;
+        })
+      );
+  }
+
+  /**
+   * Delete appointment
+   */
+  deleteAppointment(id: number): Observable<void> {
+    const url = `${this.API_URL}/${id}`;
+    
+    return this.http.delete<void>(url, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Delete appointment error:', err);
+          throw err;
+        })
+      );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SLOTS MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get available time slots for a specific date
+   */
+  getAvailableSlots(date: string): Observable<TimeSlot[]> {
+    if (!date) return of([]);
+    
+    const url = `${this.API_URL}/slots?date=${date}`;
+    
+    return this.http.get<TimeSlot[]>(url, { headers: this.getHeaders() })
+      .pipe(
+        catchError(err => {
+          console.error('Get slots error:', err);
+          // Return default slots if API fails
+          return of(this.getDefaultSlots());
+        })
+      );
+  }
+
+  /**
+   * Get default time slots (fallback)
+   */
+  private getDefaultSlots(): TimeSlot[] {
+    return [
+      { time: '08:00', label: '08:00', taken: false },
+      { time: '09:00', label: '09:00', taken: false },
+      { time: '10:00', label: '10:00', taken: false },
+      { time: '11:00', label: '11:00', taken: false },
+      { time: '14:00', label: '14:00', taken: false },
+      { time: '15:00', label: '15:00', taken: false },
+      { time: '16:00', label: '16:00', taken: false },
+      { time: '17:00', label: '17:00', taken: false },
+    ];
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STATISTICS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get appointments count by status
+   */
+  getCountByStatus(appointments: Appointment[], status: string): number {
+    return appointments.filter(apt => apt.status === status).length;
+  }
+
+  /**
+   * Get upcoming appointments
+   */
+  getUpcoming(appointments: Appointment[]): Appointment[] {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return appointments.filter(apt => {
+      const aptDate = new Date(apt.date);
+      aptDate.setHours(0, 0, 0, 0);
+      return aptDate >= today;
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  /**
+   * Get past appointments
+   */
+  getPast(appointments: Appointment[]): Appointment[] {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return appointments.filter(apt => {
+      const aptDate = new Date(apt.date);
+      aptDate.setHours(0, 0, 0, 0);
+      return aptDate < today;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
 }

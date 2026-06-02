@@ -1,7 +1,9 @@
-import { Component, signal } from '@angular/core';
+
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-
+import { Component, signal, inject, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-analytiques',
   standalone: true,
@@ -415,4 +417,28 @@ export class AnalytiquesComponent {
     const pts = data.map((v,i) => `${(i/(data.length-1))*100},${30-((v-mn)/rng)*26}`).join(' L');
     return `M0,30 L${pts} L100,30 Z`;
   }
+  private http = inject(HttpClient);
+private readonly API = environment.apiUrl;
+
+ngOnInit() {
+  // Stats
+  this.http.get<any>(`${this.API}/analytics/stats`).subscribe(s => {
+    this.kpis[0].value = String(s.totalPatients);
+    this.kpis[1].value = String(s.appointmentsToday);
+    this.kpis[2].value = String(s.completedToday);
+  });
+
+  // Monthly chart
+  this.http.get<any[]>(`${this.API}/analytics/monthly`).subscribe(data => {
+    this.chartData = data.map(d => ({
+      day: d.month,
+      consult: d.rdv,
+      cancel: Math.round(d.rdv * 0.12)
+    }));
+    this.revPoints = data.map((d, i) => ({
+      x: (i / (data.length - 1)) * 500,
+      y: 120 - (d.revenue / 7000) * 110
+    }));
+  });
+}
 }

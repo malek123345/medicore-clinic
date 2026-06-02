@@ -8,7 +8,7 @@ import { DossierService } from '../../../core/services/dossier.service';
 import { ThemeService } from '../../../core/services/theme.service';
 import { DomSanitizer } from '@angular/platform-browser';
 import { CasCliniquesService } from '../../../core/services/cas-cliniques.service';
-
+import { DataService } from '../../../core/services/data.service';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -1706,86 +1706,46 @@ import { CasCliniquesService } from '../../../core/services/cas-cliniques.servic
   `]
 })
 export class DashboardComponent implements OnInit {
-  auth = inject(AuthService);
-  rdvSvc = inject(RdvService);
+  auth    = inject(AuthService);
+  rdvSvc  = inject(RdvService);
   dossier = inject(DossierService);
-  theme = inject(ThemeService);
-  casSvc = inject(CasCliniquesService);
+  theme   = inject(ThemeService);
+  casSvc  = inject(CasCliniquesService);
+  ds      = inject(DataService);
 
   constructor(private sanitizer: DomSanitizer) {}
 
-  // ══ CAS CLINIQUES STATE ══
   showCasForm = signal(false);
   showCasList = signal(false);
   selectedCas = signal<any>(null);
 
   readonly categories = [
     { value: 'parodontologie', label: 'Parodontologie', color: '#1b7fc4' },
-    { value: 'implantologie', label: 'Implantologie', color: '#17a2b8' },
-    { value: 'chirurgie', label: 'Chirurgie', color: '#155f9a' },
+    { value: 'implantologie',  label: 'Implantologie',  color: '#17a2b8' },
+    { value: 'chirurgie',      label: 'Chirurgie',      color: '#155f9a' },
   ] as const;
 
   form = {
-    titre: '',
-    description: '',
+    titre: '', description: '',
     categorie: 'parodontologie' as 'parodontologie' | 'implantologie' | 'chirurgie',
-    traitement: '',
-    duree: '',
-    beforeImg: '',
-    afterImg: '',
-    tags: [] as string[]
+    traitement: '', duree: '', beforeImg: '', afterImg: '', tags: [] as string[]
   };
 
   readonly casCases = computed(() => this.casSvc.cases());
 
-  // ── Ouvrir modal Ajouter ──
-  openAddForm() {
-    this.resetForm();
-    this.showCasList.set(false);
-    this.showCasForm.set(true);
-  }
-
-  // ── Ouvrir modal Ajouter depuis la liste ──
-  openAddFormFromList() {
-    this.showCasList.set(false);
-    this.resetForm();
-    this.showCasForm.set(true);
-  }
-
-  // ── Fermer modal formulaire ──
-  closeForm() {
-    this.showCasForm.set(false);
-    this.resetForm();
-  }
-
-  // ── Ouvrir modal liste ──
-  openCasListModal() {
-    this.showCasForm.set(false);
-    this.showCasList.set(true);
-  }
-
-  // ── Fermer modal liste ──
-  closeCasListModal() {
-    this.showCasList.set(false);
-  }
-
-  // ── Ouvrir edit depuis la liste ──
-  openEditFromList(cas: any) {
-    this.showCasList.set(false);
-    this.openEdit(cas);
-  }
+  openAddForm()         { this.resetForm(); this.showCasList.set(false); this.showCasForm.set(true); }
+  openAddFormFromList() { this.showCasList.set(false); this.resetForm(); this.showCasForm.set(true); }
+  closeForm()           { this.showCasForm.set(false); this.resetForm(); }
+  openCasListModal()    { this.showCasForm.set(false); this.showCasList.set(true); }
+  closeCasListModal()   { this.showCasList.set(false); }
+  openEditFromList(cas: any) { this.showCasList.set(false); this.openEdit(cas); }
 
   openEdit(cas: any) {
     this.selectedCas.set(cas);
     this.form = {
-      titre: cas.titre,
-      description: cas.description,
-      categorie: cas.categorie,
-      traitement: cas.traitement ?? '',
-      duree: cas.duree ?? '',
-      beforeImg: cas.beforeImg ?? '',
-      afterImg: cas.afterImg ?? '',
-      tags: cas.tags ?? []
+      titre: cas.titre, description: cas.description, categorie: cas.categorie,
+      traitement: cas.traitement ?? '', duree: cas.duree ?? '',
+      beforeImg: cas.beforeImg ?? '', afterImg: cas.afterImg ?? '', tags: cas.tags ?? []
     };
     this.showCasList.set(false);
     this.showCasForm.set(true);
@@ -1797,16 +1757,14 @@ export class DashboardComponent implements OnInit {
   }
 
   onBeforeImage(event: any) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const file = event.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = () => { this.form.beforeImg = reader.result as string; };
     reader.readAsDataURL(file);
   }
 
   onAfterImage(event: any) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const file = event.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = () => { this.form.afterImg = reader.result as string; };
     reader.readAsDataURL(file);
@@ -1814,185 +1772,232 @@ export class DashboardComponent implements OnInit {
 
   saveCas() {
     if (!this.form.titre.trim() || !this.form.description.trim()) {
-      alert('Veuillez remplir le titre et la description');
-      return;
+      alert('Veuillez remplir le titre et la description'); return;
     }
-    const catMap: Record<string, string> = {
-      parodontologie: 'Parodontologie',
-      implantologie: 'Implantologie',
-      chirurgie: 'Chirurgie'
-    };
-    const colorMap: Record<string, string> = {
-      parodontologie: '#1b7fc4',
-      implantologie: '#17a2b8',
-      chirurgie: '#155f9a'
-    };
     const payload = {
-      titre: this.form.titre,
-      description: this.form.description,
+      titre: this.form.titre, description: this.form.description,
       categorie: this.form.categorie,
-      category: catMap[this.form.categorie],
-      catColor: colorMap[this.form.categorie],
-      traitement: this.form.traitement,
-      duree: this.form.duree,
-      beforeImg: this.form.beforeImg,
-      afterImg: this.form.afterImg,
-      tags: this.form.tags
+      category: this.getCategoryLabel(this.form.categorie),
+      catColor: this.getCategoryColor(this.form.categorie),
+      traitement: this.form.traitement, duree: this.form.duree,
+      beforeImg: this.form.beforeImg, afterImg: this.form.afterImg, tags: this.form.tags
     };
     const current = this.selectedCas();
-    if (current) {
-      this.casSvc.update(current.id, payload);
-    } else {
-      this.casSvc.add(payload);
-    }
-    this.closeForm();
-    this.showCasList.set(true);
+    if (current) { this.casSvc.update(current.id, payload); this.closeForm(); this.showCasList.set(true); }
+    else         { this.casSvc.add(payload);                this.closeForm(); this.showCasList.set(true); }
   }
 
+  getCategoryLabel(cat: string): string {
+    return ({ parodontologie:'Parodontologie', implantologie:'Implantologie', chirurgie:'Chirurgie' } as any)[cat] ?? 'Autre';
+  }
+  getCategoryColor(cat: string): string {
+    return ({ parodontologie:'#1b7fc4', implantologie:'#17a2b8', chirurgie:'#155f9a' } as any)[cat] ?? '#6366f1';
+  }
   resetForm() {
     this.selectedCas.set(null);
-    this.form = {
-      titre: '', description: '', categorie: 'parodontologie',
-      traitement: '', duree: '', beforeImg: '', afterImg: '', tags: []
-    };
+    this.form = { titre:'', description:'', categorie:'parodontologie', traitement:'', duree:'', beforeImg:'', afterImg:'', tags:[] };
+  }
+  countCat(cat: string): number { return this.casSvc.cases().filter(c => c.categorie === cat).length; }
+  getCatColor(c: string): string {
+    return ({ parodontologie:'#1b7fc4', implantologie:'#17a2b8', chirurgie:'#155f9a' } as any)[c] ?? '#6366f1';
   }
 
-  countCat(cat: string): number {
-    return this.casSvc.cases().filter(c => c.categorie === cat).length;
-  }
+  today = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
-  getCatColor(categorie: string): string {
-    const map: Record<string, string> = {
-      parodontologie: '#1b7fc4',
-      implantologie: '#17a2b8',
-      chirurgie: '#155f9a'
-    };
-    return map[categorie] ?? '#6366f1';
-  }
-
-  // ══ DASHBOARD DATA ══
-  today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-  firstName = () => this.auth.user()?.name?.replace('Dr. ', '').split(' ')[0] ?? 'Docteur';
+  firstName   = () => this.auth.user()?.name?.replace('Dr. ', '').split(' ')[0] ?? 'Docteur';
   getInitials = () => (this.auth.user()?.name ?? 'DK').replace('Dr. ', '').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-  isDoctor = () => this.auth.user()?.role === 'Doctor';
+  isDoctor    = () => this.auth.user()?.role === 'Doctor';
   isSecretary = () => this.auth.user()?.role === 'Secretary';
 
-  todayRdvs = signal<any[]>([]);
-  allRdvs = signal<any[]>([]);
+  todayRdvs  = signal<any[]>([]);
+  allRdvs    = signal<any[]>([]);
   recentOrds = signal<any[]>([]);
 
-  calMonth = signal(new Date().getMonth());
-  calYear = new Date().getFullYear();
+  calMonth     = signal(new Date().getMonth());
+  calYear      = new Date().getFullYear();
   selectedDate = signal<string | null>(null);
 
-  readonly dayNames = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  readonly dayNames   = ['L','M','M','J','V','S','D'];
   readonly monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   get monthName() { return this.monthNames[this.calMonth()]; }
 
   readonly appointmentsLimit = 136;
-  readonly limitUsed = 92;
-  readonly limitPct = Math.round((this.limitUsed / this.appointmentsLimit) * 100);
-  readonly totalPatients = 15814;
-  readonly newPatientsCount = 2543;
-  readonly returnPatients = 2736;
+  readonly limitUsed         = 92;
+  readonly limitPct          = Math.round((this.limitUsed / this.appointmentsLimit) * 100);
 
-  readonly docStats = [
-    { val: '2.543', label: 'Consultations' },
-    { val: '3.567', label: 'Total patients' },
+  totalPatients    = 0;
+  newPatientsCount = 0;
+  returnPatients   = 0;
+
+  docStats = [
+    { val: '0', label: 'Consultations'  },
+    { val: '0', label: 'Total patients' },
   ];
 
-  readonly extraStats = [
-    { val: '13.078', label: 'Consultations', sign: '+', color: '#10b981' },
-    { val: '2.736', label: 'Retour patients', sign: '+', color: '#1d6ae5' },
+  extraStats = [
+    { val: '0', label: 'Consultations',   sign: '+', color: '#10b981' },
+    { val: '0', label: 'Retour patients', sign: '+', color: '#1d6ae5' },
+  ];
+
+  miniStats: any[] = [
+    { val: 0, label: 'Nv. Patients', color: '#1d6ae5', action: 'Ajouter' },
+    { val: 0, label: 'Tâches imp.',  color: '#f59e0b', action: 'Voir'    },
+    { val: 0, label: 'Alertes',      color: '#ef4444', action: 'Gérer'   },
+  ];
+
+  weekData: any[] = [
+    { day:'L', count:0, today:false },
+    { day:'M', count:0, today:false },
+    { day:'M', count:0, today:false },
+    { day:'J', count:0, today:true  },
+    { day:'V', count:0, today:false },
+    { day:'S', count:0, today:false },
+    { day:'D', count:0, today:false },
+  ];
+
+  maxWeek   = () => Math.max(...this.weekData.map((d: any) => d.count), 1);
+  weekTotal = () => this.weekData.reduce((s: number, d: any) => s + d.count, 0);
+
+  statCards = [
+    { val:'0', label:'RDV ce mois',     color:'#1d6ae5', bg:'rgba(29,106,229,0.12)', pct:70, up:true, trend:12, icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
+    { val:'0', label:'Patients actifs', color:'#0891b2', bg:'rgba(8,145,178,0.12)',  pct:50, up:true, trend:8,  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>` },
+    { val:'0', label:'Ordonnances',     color:'#8b5cf6', bg:'rgba(139,92,246,0.12)', pct:65, up:true, trend:5,  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>` },
+    { val:'0', label:'RDV confirmés',   color:'#10b981', bg:'rgba(16,185,129,0.12)', pct:80, up:true, trend:3,  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>` },
   ];
 
   readonly quickActions = [
-    { label: 'Nouveau RDV', sub: 'Planifier un rendez-vous', path: '/doctor/rdv', color: '#1d6ae5', bg: 'rgba(29,106,229,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>` },
-    { label: 'Ordonnance', sub: 'Créer une ordonnance', path: '/doctor/ordonnances', color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>` },
-    { label: 'Nouveau patient', sub: 'Ajouter un dossier', path: '/doctor/patients', color: '#0891b2', bg: 'rgba(8,145,178,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
-    { label: 'Urgences', sub: 'Gérer les urgences', path: '/doctor/urgences', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+    { label:'Nouveau RDV',     sub:'Planifier un rendez-vous', path:'/doctor/rdv',        color:'#1d6ae5', bg:'rgba(29,106,229,0.1)',  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>` },
+    { label:'Ordonnance',      sub:'Créer une ordonnance',     path:'/doctor/ordonnances', color:'#8b5cf6', bg:'rgba(139,92,246,0.1)',  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>` },
+    { label:'Nouveau patient', sub:'Ajouter un dossier',       path:'/doctor/patients',    color:'#0891b2', bg:'rgba(8,145,178,0.1)',   icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
+    { label:'Urgences',        sub:'Gérer les urgences',       path:'/doctor/urgences',    color:'#ef4444', bg:'rgba(239,68,68,0.1)',   icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
   ];
 
   readonly secretaryActions = [
-    { label: 'Nouveau RDV', sub: 'Planifier un rendez-vous', path: '/doctor/rdv', color: '#1d6ae5', bg: 'rgba(29,106,229,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>` },
-    { label: 'Patients', sub: 'Gérer les dossiers', path: '/doctor/patients', color: '#0891b2', bg: 'rgba(8,145,178,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>` },
-    { label: 'Planning', sub: 'Voir le calendrier complet', path: '/doctor/rdv', color: '#10b981', bg: 'rgba(16,185,129,0.1)', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
+    { label:'Nouveau RDV', sub:'Planifier un rendez-vous',   path:'/doctor/rdv',      color:'#1d6ae5', bg:'rgba(29,106,229,0.1)', icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>` },
+    { label:'Patients',    sub:'Gérer les dossiers',         path:'/doctor/patients', color:'#0891b2', bg:'rgba(8,145,178,0.1)',  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>` },
+    { label:'Planning',    sub:'Voir le calendrier complet', path:'/doctor/rdv',      color:'#10b981', bg:'rgba(16,185,129,0.1)', icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
   ];
 
   ngOnInit() {
-    const todayDate = new Date().toISOString().slice(0, 10);
-    const today = this.rdvSvc.getForDate(todayDate);
-    this.todayRdvs.set((today.length > 0 ? today : this.rdvSvc.getAll().slice(0, 4)).map((r: any) => ({ ...r, grad: this.grad(r.patientName) })));
-    this.allRdvs.set(this.rdvSvc.getAll().map((r: any) => ({ ...r, grad: this.grad(r.patientName) })).sort((a: any, b: any) => b.createdAt?.localeCompare(a.createdAt ?? '') ?? 0));
-    this.recentOrds.set(this.dossier.ordonnances().slice(0, 3));
+    const todayDate = new Date().toLocaleDateString('en-CA');
+
+    this.rdvSvc.getAll().subscribe((data: any[]) => {
+      const today = data.filter((r: any) => r.date === todayDate);
+      this.todayRdvs.set(
+        (today.length > 0 ? today : data.slice(0, 4))
+          .map((r: any) => ({ ...r, grad: this.grad(r.patientName) }))
+      );
+      this.allRdvs.set(
+        data
+          .map((r: any) => ({ ...r, grad: this.grad(r.patientName) }))
+          .sort((a: any, b: any) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+      );
+    });
+
+    this.ds.getStats().subscribe((stats: any) => {
+  this.statCards[0].val = String(stats.appointmentsMonth ?? stats.appointmentsToday);
+  this.statCards[1].val = String(stats.totalPatients);
+  this.statCards[2].val = String(stats.totalOrdonnances ?? stats.completedToday);
+  this.statCards[3].val = String(stats.completedToday);
+  this.statCards[0].pct = Math.min(Math.round((stats.appointmentsMonth / 30) * 100), 100);
+  this.statCards[1].pct = Math.min(Math.round((stats.totalPatients / 100) * 100), 100);
+  this.statCards[2].pct = Math.min(Math.round((stats.totalOrdonnances / 50) * 100), 100);
+  this.statCards[3].pct = Math.min(Math.round((stats.completedToday / 10) * 100), 100);
+  this.totalPatients    = stats.totalPatients;
+  this.newPatientsCount = Math.round(stats.totalPatients * 0.16);
+  this.returnPatients   = Math.round(stats.totalPatients * 0.17);
+  this.docStats = [
+    { val: String(stats.completedToday), label: 'Consultations'  },
+    { val: String(stats.totalPatients),  label: 'Total patients' },
+  ];
+  this.extraStats = [
+    { val: String(stats.completedToday), label: 'Consultations',   sign: '+', color: '#10b981' },
+    { val: String(stats.totalPatients),  label: 'Retour patients', sign: '+', color: '#1d6ae5' },
+  ];
+});
+
+    this.ds.getWeeklyActivity().subscribe((data: any[]) => {
+      this.weekData = data.map((d: any) => ({
+        day:   d.day,
+        count: d.count,
+        today: d.isToday ?? false
+      }));
+    });
+
+    this.ds.getMiniStats().subscribe((data: any) => {
+      this.miniStats = [
+        { val: data.newPatients, label: 'Nv. Patients', color: '#1d6ae5', action: 'Ajouter' },
+        { val: data.pending,     label: 'Tâches imp.',  color: '#f59e0b', action: 'Voir'    },
+        { val: data.urgences,    label: 'Alertes',      color: '#ef4444', action: 'Gérer'   },
+      ];
+    });
+
+    this.dossier.loadOrdonnances();
+    setTimeout(() => {
+      this.recentOrds.set(this.dossier.ordonnances().slice(0, 3));
+    }, 600);
+
     this.selectedDate.set(todayDate);
   }
 
   visibleStatCards = computed(() => {
     const user = this.auth.user();
-    if (user?.role === 'Secretary') return this.statCards.filter(s => s.label === 'RDV ce mois' || s.label === 'Patients actifs');
+    if (user?.role === 'Secretary') return this.statCards.filter((s: any) => s.label === 'RDV ce mois' || s.label === 'Patients actifs');
     return this.statCards;
   });
 
   confirmedToday = computed(() => this.todayRdvs().filter(r => r.status === 'confirmed').length);
-  pendingToday = computed(() => this.todayRdvs().filter(r => r.status === 'pending').length);
+  pendingToday   = computed(() => this.todayRdvs().filter(r => r.status === 'pending').length);
 
   calendarCells = computed(() => {
-    const month = this.calMonth();
-    const year = this.calYear;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const month = this.calMonth(), year = this.calYear;
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const firstDay = new Date(year, month, 1);
     let startDow = firstDay.getDay();
     startDow = startDow === 0 ? 6 : startDow - 1;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInMonth   = new Date(year, month + 1, 0).getDate();
     const prevMonthDays = new Date(year, month, 0).getDate();
     const allRdvs = this.allRdvs();
     const cells: any[] = [];
     for (let i = startDow - 1; i >= 0; i--) {
-      const day = prevMonthDays - i;
-      const date = new Date(year, month - 1, day).toISOString().slice(0, 10);
+      const day  = prevMonthDays - i;
+      const date = new Date(year, month - 1, day).toLocaleDateString('en-CA');
       cells.push({ day, date, currentMonth: false, isToday: false, rdvCount: 0, rdvs: [] });
     }
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month, d).toISOString().slice(0, 10);
+      const date = new Date(year, month, d).toLocaleDateString('en-CA');
       const rdvs = allRdvs.filter((r: any) => r.date === date).map((r: any) => ({ ...r, grad: this.grad(r.patientName) }));
       cells.push({ day: d, date, currentMonth: true, isToday: date === todayStr, rdvCount: rdvs.length, rdvs });
     }
     let next = 1;
     while (cells.length < 42) {
-      const date = new Date(year, month + 1, next).toISOString().slice(0, 10);
+      const date = new Date(year, month + 1, next).toLocaleDateString('en-CA');
       cells.push({ day: next++, date, currentMonth: false, isToday: false, rdvCount: 0, rdvs: [] });
     }
     return cells;
   });
 
   selectedDayRdvs = computed(() => {
-    const sel = this.selectedDate();
-    if (!sel) return [];
+    const sel = this.selectedDate(); if (!sel) return [];
     return this.allRdvs().filter((r: any) => r.date === sel).map((r: any) => ({ ...r, grad: this.grad(r.patientName) }));
   });
 
   selectDate(cell: any) { this.selectedDate.set(cell.date); }
   prevMonth() { const m = this.calMonth(); if (m === 0) { this.calMonth.set(11); (this as any).calYear--; } else { this.calMonth.set(m - 1); } }
   nextMonth() { const m = this.calMonth(); if (m === 11) { this.calMonth.set(0); (this as any).calYear++; } else { this.calMonth.set(m + 1); } }
-  goToday() { const now = new Date(); this.calMonth.set(now.getMonth()); (this as any).calYear = now.getFullYear(); this.selectedDate.set(now.toISOString().slice(0, 10)); }
+  goToday()   { const now = new Date(); this.calMonth.set(now.getMonth()); (this as any).calYear = now.getFullYear(); this.selectedDate.set(now.toISOString().slice(0, 10)); }
 
   formatSelectedDate(): string {
-    const sel = this.selectedDate();
-    if (!sel) return '';
-    return new Date(sel).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const sel = this.selectedDate(); if (!sel) return '';
+    return new Date(sel).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
   }
-
   formatDate(date: string): string {
     if (!date) return '—';
-    return new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    return new Date(date).toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
   }
-
   dotColor(status: string): string {
-    return ({ confirmed: '#22c55e', pending: '#f59e0b', done: '#6366f1', cancelled: '#ef4444' } as any)[status] ?? '#6366f1';
+    return ({ confirmed:'#22c55e', pending:'#f59e0b', done:'#6366f1', cancelled:'#ef4444' } as any)[status] ?? '#6366f1';
   }
-
   grad(name: string): string {
     const g = [
       'linear-gradient(135deg,#1d6ae5,#1558c9)', 'linear-gradient(135deg,#0891b2,#0e7490)',
@@ -2001,36 +2006,11 @@ export class DashboardComponent implements OnInit {
     ];
     return g[(name.charCodeAt(0) + name.charCodeAt(name.length - 1)) % g.length];
   }
-
   badgeClass(s: string): string {
-    return ({ confirmed: 'badge-confirmed', pending: 'badge-pending', done: 'badge-done', cancelled: 'badge-cancelled' } as any)[s] ?? 'badge-done';
+    return ({ confirmed:'badge-confirmed', pending:'badge-pending', done:'badge-done', cancelled:'badge-cancelled' } as any)[s] ?? 'badge-done';
   }
-
   statusLabel(s: string): string {
-    return ({ confirmed: 'Confirmé', pending: 'En attente', done: 'Terminé', cancelled: 'Annulé' } as any)[s] ?? s;
+    return ({ confirmed:'Confirmé', pending:'En attente', done:'Terminé', cancelled:'Annulé' } as any)[s] ?? s;
   }
-
   sanitize(svg: string) { return this.sanitizer.bypassSecurityTrustHtml(svg); }
-
-  readonly miniStats = [
-    { val: 12, label: 'Nv. Patients', color: '#1d6ae5', action: 'Ajouter' },
-    { val: 9, label: 'Tâches imp.', color: '#f59e0b', action: 'Voir' },
-    { val: 4, label: 'Alertes', color: '#ef4444', action: 'Gérer' },
-  ];
-
-  readonly weekData = [
-    { day: 'L', count: 6, today: false }, { day: 'M', count: 9, today: false },
-    { day: 'M', count: 5, today: false }, { day: 'J', count: 14, today: true },
-    { day: 'V', count: 11, today: false }, { day: 'S', count: 8, today: false },
-  ];
-
-  maxWeek = () => Math.max(...this.weekData.map(d => d.count));
-  weekTotal = () => this.weekData.reduce((s, d) => s + d.count, 0);
-
-  readonly statCards = [
-    { val: '5', label: 'RDV ce mois', color: '#1d6ae5', bg: 'rgba(29,106,229,0.12)', pct: 70, up: true, trend: 12, icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>` },
-    { val: '2', label: 'Patients actifs', color: '#0891b2', bg: 'rgba(8,145,178,0.12)', pct: 50, up: true, trend: 8, icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>` },
-    { val: '3', label: 'Ordonnances', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', pct: 65, up: true, trend: 5, icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>` },
-    { val: '4', label: 'RDV confirmés', color: '#10b981', bg: 'rgba(16,185,129,0.12)', pct: 80, up: true, trend: 3, icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>` },
-  ];
 }

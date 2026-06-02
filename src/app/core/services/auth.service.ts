@@ -1,6 +1,9 @@
 // src/app/core/services/auth.service.ts
 import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export type UserRole = 'Doctor' | 'Patient' | 'Secretary';
 
@@ -30,108 +33,33 @@ export interface AuthUser {
   online?: boolean;
 }
 
-interface Account {
-  password: string;
-  user: AuthUser;
-}
-
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private router = inject(Router);
+  private http   = inject(HttpClient);
+  private readonly TOKEN_KEY   = 'khaddar_token';
+  private readonly SESSION_KEY = 'khaddar_user';
+  private readonly API         = environment.apiUrl;
+
   private _user = signal<AuthUser | null>(null);
-  user = this._user.asReadonly();
+  user      = this._user.asReadonly();
   isLoggedIn = () => this._user() !== null;
 
-  // ✅ Comptes fixes (doctor + patients de test)
-  private readonly defaultAccounts: Record<string, Account> = {
-    'doctor@gmail.tn': {
-      password: '123456',
-      user: {
-        id: 'D001',
-        name: 'Dr. Zied Khaddar',
-        role: 'Doctor',
-        email: 'doctor@khaddar.tn',
-        avatar: 'ZK',
-        specialty: 'Parodontologie & Implantologie Orale',
-        phone: '+216 71 234 567'
-      }
-    },
-    'karim@gmail.com': {
-      password: '123456',
-      user: {
-        id: 'P001',
-        name: 'Karim Ayoub',
-        role: 'Patient',
-        email: 'karim@gmail.com',
-        avatar: 'KA',
-        patientId: 'PAT-001',
-        phone: '+216 55 123 456',
-        dateNaissance: '15/03/1985',
-        groupeSanguin: 'A+'
-      }
-    },
-    'sana@gmail.com': {
-      password: '123456',
-      user: {
-        id: 'P002',
-        name: 'Sana Ben Ali',
-        role: 'Patient',
-        email: 'sana@gmail.com',
-        avatar: 'SB',
-        patientId: 'PAT-002',
-        phone: '+216 98 765 432',
-        dateNaissance: '22/07/1992',
-        groupeSanguin: 'O+'
-      }
-    }
-  };
-
-  // ✅ Clé localStorage pour les comptes dynamiques
-  private readonly STORAGE_KEY = 'khaddar_accounts';
-  private readonly SESSION_KEY = 'khaddar_user';
-  private readonly SECRETARIES_KEY = 'khaddar_secretaries';
+  // ✅ Callbacks pour reset au logout
+  logoutCallbacks: (() => void)[] = [];
 
   constructor() {
     this.loadUserFromSession();
-    this.migrateOldData();
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  GESTION DES COMPTES DYNAMIQUES
-  // ═══════════════════════════════════════════════════════════
-
-  private getDynamicAccounts(): Record<string, Account> {
-    try {
-      const saved = localStorage.getItem(this.STORAGE_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  private saveDynamicAccounts(accounts: Record<string, Account>) {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(accounts));
-  }
-
-  private getAllAccounts(): Record<string, Account> {
-    return { ...this.defaultAccounts, ...this.getDynamicAccounts() };
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  //  GESTION SESSION
+  //  SESSION
   // ═══════════════════════════════════════════════════════════
 
   private loadUserFromSession() {
     const saved = sessionStorage.getItem(this.SESSION_KEY);
     if (saved) {
-      try {
-        const user = JSON.parse(saved);
-        this._user.set(user);
-        // Mettre à jour le statut online si secrétaire
-        if (user.role === 'Secretary') {
-          this.updateSecretaryOnlineStatus(user.email, true);
-        }
-      } catch {}
+      try { this._user.set(JSON.parse(saved)); } catch {}
     }
   }
 
@@ -141,80 +69,73 @@ export class AuthService {
 
   private clearSession() {
     sessionStorage.removeItem(this.SESSION_KEY);
+    sessionStorage.removeItem(this.TOKEN_KEY);
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  MIGRATION ANCIENNES DONNÉES
-  // ═══════════════════════════════════════════════════════════
-
-  private migrateOldData() {
-    try {
-      // Migrer anciennes secrétaires si elles existent
-      const oldSecretaries = localStorage.getItem('medspace_secretaries');
-      if (oldSecretaries) {
-        const secretaries = JSON.parse(oldSecretaries);
-        const dynamic = this.getDynamicAccounts();
-
-        secretaries.forEach((sec: any) => {
-          const email = sec.email.toLowerCase().trim();
-          if (!dynamic[email]) {
-            dynamic[email] = {
-              password: sec.password || '123456',
-              user: {
-                id: sec.id,
-                name: `${sec.firstName} ${sec.lastName}`,
-                role: 'Secretary',
-                email: sec.email,
-                avatar: `${sec.firstName[0]}${sec.lastName[0]}`.toUpperCase(),
-                phone: sec.phone,
-                permissions: sec.permissions,
-                doctorId: sec.doctorId,
-                createdAt: sec.createdAt,
-                online: false
-              }
-            };
-          }
-        });
-
-        this.saveDynamicAccounts(dynamic);
-        localStorage.removeItem('medspace_secretaries');
-      }
-    } catch {}
+  getToken(): string | null {
+    return sessionStorage.getItem(this.TOKEN_KEY);
   }
 
   // ═══════════════════════════════════════════════════════════
   //  AUTHENTIFICATION
   // ═══════════════════════════════════════════════════════════
 
-  login(email: string, password: string): boolean {
-    const emailKey = email.toLowerCase().trim();
-    const accounts = this.getAllAccounts();
-    const account = accounts[emailKey];
+ async login(email: string, password: string): Promise<boolean> {
+  try {
+    const res: any = await firstValueFrom(
+      this.http.post(`${this.API}/auth/login`, { email, password })
+    );
 
-    if (account && account.password === password) {
-      const user = { ...account.user };
-      
-      // Mettre à jour le statut online pour les secrétaires
-      if (user.role === 'Secretary') {
-        this.updateSecretaryOnlineStatus(emailKey, true);
-        user.online = true;
-      }
+    sessionStorage.setItem(this.TOKEN_KEY, res.token);
 
-      this._user.set(user);
-      this.saveUserToSession(user);
-      return true;
+   const user: AuthUser = {
+  id:       String(res.user.id),
+  name:     res.user.name,
+  role:     res.user.role,
+  email:    res.user.email,
+  avatar:   res.user.avatar,
+  // ✅ زيد هذه
+  permissions: res.user.permissions ? {
+    rdv:          res.user.permissions.rdv          ?? false,
+    patients:     res.user.permissions.patients     ?? false,
+    ordonnances:  res.user.permissions.ordonnances  ?? false,
+    paiements:    res.user.permissions.paiements    ?? false,
+    parametres:   res.user.permissions.parametres   ?? false,
+    urgences:     res.user.permissions.urgences     ?? false,
+  } : undefined,
+  patientId:   res.user.patientId,
+  phone:       res.user.phone,
+  specialty:   res.user.specialty,
+};
+
+    this._user.set(user);
+    this.saveUserToSession(user);
+
+    return true;
+  } catch (err: any) {
+
+    const msg = err?.error?.message;
+
+    if (msg === "EMAIL_NOT_VERIFIED") {
+      alert("Compte non vérifié. Vérifiez votre email.");
+    } else if (msg === "INVALID_CREDENTIALS") {
+      alert("Email ou mot de passe incorrect.");
+    } else {
+      alert("Erreur serveur");
     }
 
     return false;
   }
+}
 
-  logout() {
-    const user = this._user();
-    
-    // Mettre à jour le statut offline pour les secrétaires
-    if (user?.role === 'Secretary' && user.email) {
-      this.updateSecretaryOnlineStatus(user.email, false);
-    }
+  async logout() {
+    try {
+      await firstValueFrom(this.http.post(`${this.API}/auth/logout`, {}));
+    } catch {}
+
+    // ✅ reset الإشعارات عند الخروج
+    this.logoutCallbacks.forEach(cb => cb());
+    this.logoutCallbacks = [];
 
     this._user.set(null);
     this.clearSession();
@@ -222,171 +143,123 @@ export class AuthService {
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  GESTION DES SECRÉTAIRES
+  //  SECRETAIRES — via API
   // ═══════════════════════════════════════════════════════════
 
-  createSecretaryAccount(data: {
+  async createSecretaryAccount(data: {
     firstName: string;
     lastName: string;
     email: string;
     phone: string;
     password: string;
     permissions: Permissions;
-  }): { success: boolean; error?: string } {
-    const emailKey = data.email.toLowerCase().trim();
-
-    // Vérifier si l'email existe déjà
-    const allAccounts = this.getAllAccounts();
-    if (allAccounts[emailKey]) {
-      return { success: false, error: 'Cet email est déjà utilisé.' };
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.API}/secretaries`, {
+          firstName:   data.firstName,
+          lastName:    data.lastName,
+          email:       data.email,
+          phone:       data.phone,
+          password:    data.password,
+          permissions: data.permissions,
+        })
+      );
+      return { success: true };
+    } catch (err: any) {
+      const msg = err?.error?.message || 'Erreur lors de la création.';
+      return { success: false, error: msg };
     }
-
-    // Validation
-    if (!data.firstName || !data.lastName) {
-      return { success: false, error: 'Nom et prénom sont obligatoires.' };
-    }
-
-    if (!data.email || !this.isValidEmail(data.email)) {
-      return { success: false, error: 'Email invalide.' };
-    }
-
-    if (!data.password || data.password.length < 6) {
-      return { success: false, error: 'Le mot de passe doit contenir au moins 6 caractères.' };
-    }
-
-    // Créer le nouveau compte secrétaire
-    const currentUser = this._user();
-    const newUser: AuthUser = {
-      id: 'SEC_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      name: `${data.firstName} ${data.lastName}`,
-      role: 'Secretary',
-      email: data.email,
-      avatar: `${data.firstName[0]}${data.lastName[0]}`.toUpperCase(),
-      phone: data.phone,
-      specialty: 'Secrétaire Médicale',
-      permissions: data.permissions,
-      doctorId: currentUser?.id || 'D001',
-      createdAt: new Date().toISOString(),
-      online: false
-    };
-
-    // Sauvegarder
-    const dynamic = this.getDynamicAccounts();
-    dynamic[emailKey] = {
-      password: data.password,
-      user: newUser
-    };
-    this.saveDynamicAccounts(dynamic);
-
-    return { success: true };
   }
 
-  getSecretaries(): AuthUser[] {
-    const currentUser = this._user();
-    if (currentUser?.role !== 'Doctor') return [];
-
-    const dynamic = this.getDynamicAccounts();
-    return Object.values(dynamic)
-      .filter(account => 
-        account.user.role === 'Secretary' && 
-        account.user.doctorId === currentUser.id
-      )
-      .map(account => account.user)
-      .sort((a, b) => {
-        const dateA = new Date(a.createdAt || 0).getTime();
-        const dateB = new Date(b.createdAt || 0).getTime();
-        return dateB - dateA;
-      });
-  }
-
-  getSecretaryByEmail(email: string): AuthUser | null {
-    const emailKey = email.toLowerCase().trim();
-    const accounts = this.getAllAccounts();
-    const account = accounts[emailKey];
-    
-    if (account && account.user.role === 'Secretary') {
-      return account.user;
+  async getSecretaries(): Promise<AuthUser[]> {
+    try {
+      const res: any[] = await firstValueFrom(
+        this.http.get<any[]>(`${this.API}/secretaries`)
+      );
+      return res.map(s => ({
+        id:          String(s.id),
+        name:        s.name,
+        role:        'Secretary' as UserRole,
+        email:       s.email,
+        avatar:      s.avatar || s.name?.slice(0, 2).toUpperCase(),
+        phone:       s.phone,
+        permissions: s.permissions,
+        online:      s.online,
+        createdAt:   s.createdAt,
+      }));
+    } catch {
+      return [];
     }
-    
-    return null;
   }
 
-  updateSecretaryPermissions(email: string, permissions: Permissions): boolean {
-    const emailKey = email.toLowerCase().trim();
-    const dynamic = this.getDynamicAccounts();
-    const account = dynamic[emailKey];
-
-    if (!account || account.user.role !== 'Secretary') {
+  async updateSecretaryPermissions(
+    email: string,
+    permissions: Permissions
+  ): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.http.put(`${this.API}/secretaries/${email}/permissions`, { permissions })
+      );
+      return true;
+    } catch {
       return false;
     }
-
-    account.user.permissions = permissions;
-    this.saveDynamicAccounts(dynamic);
-
-    // Si c'est l'utilisateur connecté, mettre à jour la session
-    const currentUser = this._user();
-    if (currentUser?.email === emailKey) {
-      const updatedUser = { ...currentUser, permissions };
-      this._user.set(updatedUser);
-      this.saveUserToSession(updatedUser);
-    }
-
-    return true;
   }
 
-  updateSecretaryOnlineStatus(email: string, online: boolean): void {
-    const emailKey = email.toLowerCase().trim();
-    const dynamic = this.getDynamicAccounts();
-    const account = dynamic[emailKey];
-
-    if (account && account.user.role === 'Secretary') {
-      account.user.online = online;
-      this.saveDynamicAccounts(dynamic);
+  async changeSecretaryPassword(
+    email: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.put(`${this.API}/secretaries/${email}/password`, { newPassword })
+      );
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.error?.message || 'Erreur.' };
     }
   }
 
-  deleteSecretary(email: string): { success: boolean; error?: string } {
-    const emailKey = email.toLowerCase().trim();
-    const dynamic = this.getDynamicAccounts();
-    const account = dynamic[emailKey];
-
-    if (!account) {
-      return { success: false, error: 'Compte non trouvé.' };
+  async deleteSecretary(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.delete(`${this.API}/secretaries/${email}`)
+      );
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.error?.message || 'Erreur.' };
     }
-
-    if (account.user.role !== 'Secretary') {
-      return { success: false, error: 'Ce compte n\'est pas une secrétaire.' };
-    }
-
-    // Vérifier que ce n'est pas l'utilisateur connecté
-    const currentUser = this._user();
-    if (currentUser?.email === emailKey) {
-      return { success: false, error: 'Impossible de supprimer votre propre compte.' };
-    }
-
-    delete dynamic[emailKey];
-    this.saveDynamicAccounts(dynamic);
-
-    return { success: true };
   }
 
-  changeSecretaryPassword(email: string, newPassword: string): { success: boolean; error?: string } {
-    if (!newPassword || newPassword.length < 6) {
-      return { success: false, error: 'Le mot de passe doit contenir au moins 6 caractères.' };
+  async updateProfile(data: {
+    nom?: string; prenom?: string; spec?: string; tel?: string; email?: string;
+  }): Promise<boolean> {
+    try {
+      const res: any = await firstValueFrom(
+        this.http.put(`${this.API}/auth/me`, data)
+      );
+      const current = this._user();
+      if (current) {
+        const updated = { ...current, name: res.name, specialty: res.specialty, phone: res.phone, email: res.email };
+        this._user.set(updated);
+        this.saveUserToSession(updated);
+      }
+      return true;
+    } catch {
+      return false;
     }
+  }
 
-    const emailKey = email.toLowerCase().trim();
-    const dynamic = this.getDynamicAccounts();
-    const account = dynamic[emailKey];
-
-    if (!account || account.user.role !== 'Secretary') {
-      return { success: false, error: 'Compte non trouvé.' };
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.put(`${this.API}/auth/me/password`, { currentPassword, newPassword })
+      );
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.error?.message || 'Erreur.' };
     }
-
-    account.password = newPassword;
-    this.saveDynamicAccounts(dynamic);
-
-    return { success: true };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -395,38 +268,17 @@ export class AuthService {
 
   hasPermission(permission: keyof Permissions): boolean {
     const user = this._user();
-    
-    // Le médecin a toutes les permissions
     if (user?.role === 'Doctor') return true;
-    
-    // La secrétaire vérifie ses permissions
-    if (user?.role === 'Secretary') {
-      return user.permissions?.[permission] === true;
-    }
-    
+    if (user?.role === 'Secretary') return user.permissions?.[permission] === true;
     return false;
   }
 
   getPermissions(): Permissions | null {
     const user = this._user();
-    
-    // Le médecin a toutes les permissions
     if (user?.role === 'Doctor') {
-      return {
-        rdv: true,
-        patients: true,
-        ordonnances: true,
-        paiements: true,
-        parametres: true,
-        urgences: true
-      };
+      return { rdv: true, patients: true, ordonnances: true, paiements: true, parametres: true, urgences: true };
     }
-    
-    // Retourner les permissions de la secrétaire
-    if (user?.role === 'Secretary') {
-      return user.permissions || null;
-    }
-    
+    if (user?.role === 'Secretary') return user.permissions || null;
     return null;
   }
 
@@ -437,88 +289,18 @@ export class AuthService {
   getDashboardRoute(): string {
     const role = this._user()?.role;
     if (role === 'Patient') return '/';
-    if (role === 'Doctor') return '/doctor/dashboard';
-    if (role === 'Secretary') return '/doctor/dashboard';
+    if (role === 'Doctor' || role === 'Secretary') return '/doctor/dashboard';
     return '/login';
   }
 
-  isDoctor(): boolean {
-    return this._user()?.role === 'Doctor';
-  }
+  isDoctor():    boolean { return this._user()?.role === 'Doctor'; }
+  isSecretary(): boolean { return this._user()?.role === 'Secretary'; }
+  isPatient():   boolean { return this._user()?.role === 'Patient'; }
+  getUserRole(): UserRole | null { return this._user()?.role || null; }
+  getUserName(): string { return this._user()?.name || 'Utilisateur'; }
+  getUserAvatar(): string { return this._user()?.avatar || 'U'; }
 
-  isSecretary(): boolean {
-    return this._user()?.role === 'Secretary';
-  }
-
-  isPatient(): boolean {
-    return this._user()?.role === 'Patient';
-  }
-
-  getUserRole(): UserRole | null {
-    return this._user()?.role || null;
-  }
-
-  getUserName(): string {
-    return this._user()?.name || 'Utilisateur';
-  }
-
-  getUserAvatar(): string {
-    return this._user()?.avatar || 'U';
-  }
-
-  private isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  //  STATISTIQUES (pour le dashboard)
-  // ═══════════════════════════════════════════════════════════
-
-  getSecretariesStats(): {
-    total: number;
-    online: number;
-    offline: number;
-  } {
-    const secretaries = this.getSecretaries();
-    return {
-      total: secretaries.length,
-      online: secretaries.filter(s => s.online).length,
-      offline: secretaries.filter(s => !s.online).length
-    };
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  //  DEBUG / ADMIN
-  // ═══════════════════════════════════════════════════════════
-
-  clearAllData(): void {
-    if (confirm('⚠️ ATTENTION: Supprimer toutes les données ? (comptes secrétaires)')) {
-      localStorage.removeItem(this.STORAGE_KEY);
-      localStorage.removeItem(this.SECRETARIES_KEY);
-      this.logout();
-      window.location.reload();
-    }
-  }
-
-  exportData(): string {
-    const data = {
-      accounts: this.getDynamicAccounts(),
-      timestamp: new Date().toISOString()
-    };
-    return JSON.stringify(data, null, 2);
-  }
-
-  importData(jsonData: string): { success: boolean; error?: string } {
-    try {
-      const data = JSON.parse(jsonData);
-      if (data.accounts) {
-        this.saveDynamicAccounts(data.accounts);
-        return { success: true };
-      }
-      return { success: false, error: 'Format de données invalide.' };
-    } catch {
-      return { success: false, error: 'Erreur lors de l\'import des données.' };
-    }
+  getSecretariesStats(): { total: number; online: number; offline: number } {
+    return { total: 0, online: 0, offline: 0 };
   }
 }

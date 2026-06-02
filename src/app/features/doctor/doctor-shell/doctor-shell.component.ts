@@ -7,7 +7,7 @@ import { AuthService, Permissions } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { ThemeService } from '../../../core/services/theme.service';
 import { DomSanitizer } from '@angular/platform-browser';
-
+import { NotificationService } from '../../../core/services/notification.service';
 type PermissionKey = keyof Permissions;
 
 @Component({
@@ -114,6 +114,72 @@ type PermissionKey = keyof Permissions;
       </div>
     </div>
   }
+  @if (showDeleteModal()) {
+
+  <div class="modal-veil" (click)="closeDeletePopup()">
+
+    <div class="modal-box" (click)="$event.stopPropagation()">
+
+      <div class="modal-hd">
+
+        <div class="modal-title">
+          Supprimer une secrétaire
+        </div>
+
+      </div>
+
+      <div class="modal-body">
+
+        @for (s of secretariesList(); track s.email) {
+
+          <div class="sec-delete-item">
+
+            <div>
+              <strong>{{ s.name }}</strong>
+              <div>{{ s.email }}</div>
+            </div>
+
+            <button class="delete-btn"
+                    (click)="openDeleteSecretary(s)">
+              Choisir
+            </button>
+
+          </div>
+
+        }
+
+        @if (selectedSecretary()) {
+
+          <div class="confirm-zone">
+
+            Voulez-vous vraiment supprimer
+            <strong>{{ selectedSecretary().name }}</strong> ?
+
+            <div class="confirm-actions">
+
+              <button class="btn-cncl"
+                      (click)="closeDeletePopup()">
+                Annuler
+              </button>
+
+              <button class="delete-final-btn"
+                      (click)="confirmDeleteSecretary()">
+                Oui supprimer
+              </button>
+
+            </div>
+
+          </div>
+
+        }
+
+      </div>
+
+    </div>
+
+  </div>
+
+}
 
   <!-- ══════════════════ SIDEBAR ══════════════════ -->
   <aside class="sidebar" [class.mob-open]="mobOpen()">
@@ -172,6 +238,19 @@ type PermissionKey = keyof Permissions;
         <div class="sb-add-ico"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
         Ajouter une secrétaire
       </button>
+      <button class="sb-delete" (click)="showDeleteModal.set(true)">
+  <div class="sb-add-ico">
+    <svg width="11" height="11" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6l-1 14H6L5 6"/>
+      <path d="M10 11v6"/>
+      <path d="M14 11v6"/>
+    </svg>
+  </div>
+
+  Supprimer une secrétaire
+</button>
     }
 
     <div class="sb-hr"></div>
@@ -205,10 +284,42 @@ type PermissionKey = keyof Permissions;
           @if (theme.isDark()) {<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>}
           @else {<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}
         </button>
-        <div class="tb-notif">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="notif-pip"></span>
+        <div class="tb-notif" (click)="toggleNotifs()" style="position:relative">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  @if (notifSvc.unreadCount() > 0) {
+    <span class="notif-badge">{{ notifSvc.unreadCount() }}</span>
+  }
+
+  @if (showNotifs()) {
+    <div class="notif-dropdown" (click)="$event.stopPropagation()">
+      <div class="notif-hd">
+        <span class="notif-title">Notifications</span>
+        @if (notifSvc.unreadCount() > 0) {
+          <button class="notif-read-all" (click)="notifSvc.markAllRead()">Tout lire</button>
+        }
+      </div>
+      @if (notifSvc.notifications().length === 0) {
+        <div class="notif-empty">Aucune notification</div>
+      }
+      @for (n of notifSvc.notifications(); track n.id) {
+        <div class="notif-item" [class.unread]="!n.isRead" (click)="notifSvc.markRead(n.id)">
+          <div class="notif-ico" [class]="'ico-'+n.type">
+            @if (n.type === 'success') { ✓ }
+            @else if (n.type === 'warning') { ⚠ }
+            @else if (n.type === 'error') { ✕ }
+            @else { ℹ }
+          </div>
+          <div class="notif-body">
+            <div class="notif-item-title">{{ n.title }}</div>
+            <div class="notif-item-msg">{{ n.message }}</div>
+            <div class="notif-item-time">{{ formatTime(n.createdAt) }}</div>
+          </div>
+          <button class="notif-del" (click)="$event.stopPropagation(); notifSvc.deleteNotif(n.id)">×</button>
         </div>
+      }
+    </div>
+  }
+</div>
         <div class="tb-user">
           <div class="tb-av">{{ getInitials() }}</div>
           <div class="tb-uinfo">
@@ -494,7 +605,27 @@ type PermissionKey = keyof Permissions;
     .page-content::-webkit-scrollbar { width:4px; }
     .page-content::-webkit-scrollbar-thumb { background:rgba(29,95,224,0.15); border-radius:99px; }
     .page-content::-webkit-scrollbar-thumb:hover { background:rgba(29,95,224,0.28); }
-
+.notif-badge { position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;font-size:10px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center;border:2px solid var(--bg3); }
+.notif-dropdown { position:absolute;top:calc(100% + 10px);right:0;width:340px;background:var(--bg2);border:1px solid var(--brd);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2);z-index:9999;overflow:hidden;animation:dropIn .2s ease; }
+@keyframes dropIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
+.notif-hd { display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--brd); }
+.notif-title { font-size:14px;font-weight:700;color:var(--txt1); }
+.notif-read-all { font-size:12px;color:var(--P);background:none;border:none;cursor:pointer;font-weight:600; }
+.notif-empty { padding:32px;text-align:center;color:var(--txt3);font-size:13px; }
+.notif-item { display:flex;align-items:flex-start;gap:12px;padding:12px 18px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--brd); }
+.notif-item:hover { background:var(--bg3); }
+.notif-item.unread { background:rgba(27,127,196,.06); }
+.notif-ico { width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0; }
+.ico-info    { background:rgba(27,127,196,.15);color:#1b7fc4; }
+.ico-success { background:rgba(34,197,94,.15);color:#16a34a; }
+.ico-warning { background:rgba(245,158,11,.15);color:#d97706; }
+.ico-error   { background:rgba(239,68,68,.15);color:#dc2626; }
+.notif-body { flex:1; }
+.notif-item-title { font-size:13px;font-weight:600;color:var(--txt1); }
+.notif-item-msg   { font-size:12px;color:var(--txt3);margin-top:2px; }
+.notif-item-time  { font-size:11px;color:var(--txt3);margin-top:4px; }
+.notif-del { background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 4px;opacity:0;transition:opacity .15s; }
+.notif-item:hover .notif-del { opacity:1; }
     /* ══════════════════════════════════
        MODAL
     ══════════════════════════════════ */
@@ -555,7 +686,59 @@ type PermissionKey = keyof Permissions;
     .toast-x:hover { color:var(--txt); }
     .toast-prog { position:absolute; bottom:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--P),var(--violet)); border-radius:0 0 18px 18px; animation:tProg 4s linear forwards; }
     @keyframes tProg { from{width:100%} to{width:0%} }
+     .sb-delete{
+  margin-top:10px;
+  width:100%;
+  background:#ef4444;
+  color:white;
+  border:none;
+  border-radius:14px;
+  padding:12px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight:600;
+}
 
+.sec-delete-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  border-bottom:1px solid #eee;
+}
+
+.delete-btn{
+  background:#ef4444;
+  color:white;
+  border:none;
+  padding:8px 12px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.confirm-zone{
+  margin-top:20px;
+  padding:15px;
+  border-radius:12px;
+  background:#fff5f5;
+}
+
+.confirm-actions{
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+}
+
+.delete-final-btn{
+  background:#dc2626;
+  color:white;
+  border:none;
+  padding:10px 14px;
+  border-radius:10px;
+  cursor:pointer;
+}
     /* ══════════════════════════════════
        MOBILE
     ══════════════════════════════════ */
@@ -576,13 +759,16 @@ export class DoctorShellComponent implements OnInit {
   toast = inject(ToastService);
   theme = inject(ThemeService);
   router = inject(Router);
-
+  notifSvc  = inject(NotificationService);
   mobOpen = signal(false);
+  showNotifs = signal(false);
+
   searchQuery = '';
   showSecretaryModal = signal(false);
   saving = signal(false);
   secError = signal('');
-
+  showDeleteModal = signal(false);
+selectedSecretary = signal<any>(null);
   newSec = this.emptySec();
 
   readonly dnaPoints = Array.from({ length: 20 }, (_, i) => ({
@@ -597,9 +783,19 @@ export class DoctorShellComponent implements OnInit {
   //  COMPUTED SIGNALS
   // ═══════════════════════════════════════════════════════════
 
-  secretariesList = computed(() => {
-    return this.auth.getSecretaries();
-  });
+  secretariesList = signal<any[]>([]);
+
+async ngOnInit() {
+  this.updateDate();
+  setInterval(() => this.updateDate(), 60000);
+
+  // Load secretaries if doctor
+  if (this.auth.isDoctor()) {
+    const secs = await this.auth.getSecretaries();
+    this.secretariesList.set(secs);
+  }
+  this.notifSvc.init();
+}
 
   visibleNavItems = computed(() => {
     const user = this.auth.user();
@@ -686,16 +882,8 @@ export class DoctorShellComponent implements OnInit {
       label: 'Ordonnances',
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>`
     },
-    {
-      key: 'paiements',
-      label: 'Paiements',
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`
-    },
-    {
-      key: 'urgences',
-      label: 'Urgences',
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`
-    },
+   
+   
     {
       key: 'parametres',
       label: 'Paramètres',
@@ -707,11 +895,7 @@ export class DoctorShellComponent implements OnInit {
   //  LIFECYCLE
   // ═══════════════════════════════════════════════════════════
 
-  ngOnInit() {
-    this.updateDate();
-    setInterval(() => this.updateDate(), 60000);
-  }
-
+  
   updateDate() {
     // Date update if needed
   }
@@ -745,52 +929,58 @@ export class DoctorShellComponent implements OnInit {
     this.secError.set('');
   }
 
-  saveSec() {
-    const s = this.newSec;
+ async saveSec() {
+  const s = this.newSec;
 
-    // Validation
-    if (!s.firstName || !s.lastName || !s.email || !s.password) {
-      this.secError.set('Veuillez remplir tous les champs obligatoires.');
-      return;
-    }
-
-    if (s.password !== s.confirmPassword) {
-      this.secError.set('Les mots de passe ne correspondent pas.');
-      return;
-    }
-
-    if (s.password.length < 6) {
-      this.secError.set('Le mot de passe doit contenir au moins 6 caractères.');
-      return;
-    }
-
-    this.saving.set(true);
-    this.secError.set('');
-
-    // Simuler un délai de création
-    setTimeout(() => {
-      const result = this.auth.createSecretaryAccount({
-        firstName: s.firstName,
-        lastName: s.lastName,
-        email: s.email,
-        phone: s.phone,
-        password: s.password,
-        permissions: s.permissions
-      });
-
-      if (result.success) {
-        this.saving.set(false);
-        this.closeModal();
-        this.toast.success(
-          'Secrétaire ajoutée',
-          `${s.firstName} ${s.lastName} peut maintenant se connecter.`
-        );
-      } else {
-        this.secError.set(result.error || 'Erreur lors de la création du compte.');
-        this.saving.set(false);
-      }
-    }, 1200);
+  // Validation
+  if (!s.firstName || !s.lastName || !s.email || !s.password) {
+    this.secError.set('Veuillez remplir tous les champs obligatoires.');
+    return;
   }
+
+  if (s.password !== s.confirmPassword) {
+    this.secError.set('Les mots de passe ne correspondent pas.');
+    return;
+  }
+
+  if (s.password.length < 6) {
+    this.secError.set('Le mot de passe doit contenir au moins 6 caractères.');
+    return;
+  }
+
+  this.saving.set(true);
+  this.secError.set('');
+
+  // Simulate delay for better UX
+  await new Promise(resolve => setTimeout(resolve, 1200));
+
+  const result = await this.auth.createSecretaryAccount({
+    firstName: s.firstName,
+    lastName: s.lastName,
+    email: s.email,
+    phone: s.phone,
+    password: s.password,
+    permissions: s.permissions
+  });
+
+  if (result.success) {
+    this.saving.set(false);
+    this.closeModal();
+    this.toast.success(
+      'Secrétaire ajoutée',
+      `${s.firstName} ${s.lastName} peut maintenant se connecter.`
+    );
+    
+    // Reload secretaries list
+    if (this.auth.isDoctor()) {
+      const secs = await this.auth.getSecretaries();
+      this.secretariesList.set(secs);
+    }
+  } else {
+    this.secError.set(result.error || 'Erreur lors de la création du compte.');
+    this.saving.set(false);
+  }
+}
 
   // ═══════════════════════════════════════════════════════════
   //  UTILITIES
@@ -799,6 +989,21 @@ export class DoctorShellComponent implements OnInit {
   getInitials(): string {
     return this.auth.getUserAvatar();
   }
+  toggleNotifs() {
+  this.showNotifs.update(v => !v);
+}
+
+formatTime(date: string): string {
+  const d = new Date(date);
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (diff < 60)    return 'À l\'instant';
+  if (diff < 3600)  return `Il y a ${Math.floor(diff/60)} min`;
+  if (diff < 86400) return `Il y a ${Math.floor(diff/3600)}h`;
+  return d.toLocaleDateString('fr-FR');
+}
+
+
 
   getUserRole(): string {
     const user = this.auth.user();
@@ -807,4 +1012,47 @@ export class DoctorShellComponent implements OnInit {
     if (user?.role === 'Patient') return 'Patient';
     return 'Utilisateur';
   }
+  openDeleteSecretary(sec: any) {
+  this.selectedSecretary.set(sec);
+}
+
+closeDeletePopup() {
+  this.selectedSecretary.set(null);
+  this.showDeleteModal.set(false);
+}
+
+async confirmDeleteSecretary() {
+
+  const sec = this.selectedSecretary();
+
+  if (!sec) return;
+
+  if (!sec?.email) {
+  this.toast.error('Erreur', 'Secrétaire invalide');
+  return;
+}
+
+const result = await this.auth.deleteSecretary(sec.email);
+
+  if (result.success) {
+
+    this.toast.success(
+      'Secrétaire supprimée',
+      `${sec.name} a été supprimée`
+    );
+
+    const secs = await this.auth.getSecretaries();
+    this.secretariesList.set(secs);
+
+    this.closeDeletePopup();
+
+  } else {
+
+    this.toast.error(
+      'Erreur',
+      result.error || 'Suppression impossible'
+    );
+
+  }
+}
 }

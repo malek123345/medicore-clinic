@@ -1,5 +1,7 @@
-// src/app/core/services/secretary.service.ts
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface Secretary {
   id: string;
@@ -7,7 +9,7 @@ export interface Secretary {
   lastName: string;
   email: string;
   phone: string;
-  password: string;
+  password?: string;
   permissions: {
     rdv: boolean;
     patients: boolean;
@@ -18,65 +20,35 @@ export interface Secretary {
   };
   online: boolean;
   createdAt: string;
-  doctorId: string;
+  doctorId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class SecretaryService {
-  private secretaries = signal<Secretary[]>([]);
+  private http = inject(HttpClient);
+  private readonly API = `${environment.apiUrl}/secretaries`;
 
-  constructor() {
-    this.loadFromStorage();
+  getAll(): Observable<Secretary[]> {
+    return this.http.get<Secretary[]>(this.API);
   }
 
-  private loadFromStorage() {
-    const stored = localStorage.getItem('medspace_secretaries');
-    if (stored) {
-      this.secretaries.set(JSON.parse(stored));
-    }
+  getByEmail(email: string): Observable<Secretary> {
+    return this.http.get<Secretary>(`${this.API}/${email}`);
   }
 
-  private saveToStorage() {
-    localStorage.setItem('medspace_secretaries', JSON.stringify(this.secretaries()));
+  create(secretary: Omit<Secretary, 'id' | 'createdAt' | 'online'>): Observable<any> {
+    return this.http.post(this.API, secretary);
   }
 
-  getAll() {
-    return this.secretaries();
+  update(id: string, updates: Partial<Secretary>): Observable<any> {
+    return this.http.put(`${this.API}/${id}`, updates);
   }
 
-  getByEmail(email: string): Secretary | undefined {
-    return this.secretaries().find(s => s.email === email);
+  updatePermissions(email: string, permissions: any): Observable<any> {
+    return this.http.put(`${this.API}/${email}/permissions`, { permissions });
   }
 
-  create(secretary: Omit<Secretary, 'id' | 'createdAt' | 'online'>): Secretary {
-    const newSecretary: Secretary = {
-      ...secretary,
-      id: 'sec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-      online: false
-    };
-    
-    this.secretaries.update(list => [...list, newSecretary]);
-    this.saveToStorage();
-    return newSecretary;
-  }
-
-  update(id: string, updates: Partial<Secretary>) {
-    this.secretaries.update(list => 
-      list.map(s => s.id === id ? { ...s, ...updates } : s)
-    );
-    this.saveToStorage();
-  }
-
-  delete(id: string) {
-    this.secretaries.update(list => list.filter(s => s.id !== id));
-    this.saveToStorage();
-  }
-
-  setOnlineStatus(email: string, online: boolean) {
-    this.secretaries.update(list =>
-      list.map(s => s.email === email ? { ...s, online } : s)
-    );
-    this.saveToStorage();
+  delete(email: string): Observable<any> {
+    return this.http.delete(`${this.API}/${email}`);
   }
 }

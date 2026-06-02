@@ -1,9 +1,9 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RdvService } from '../../../core/services/rdv.service';
 import { ToastService } from '../../../core/services/toast.service';
-
+import { PatientsService } from '../../../core/services/patients.service';
 @Component({
   selector: 'app-rdv',
   standalone: true,
@@ -37,7 +37,7 @@ import { ToastService } from '../../../core/services/toast.service';
         </svg>
         Rendez-vous
       </h1>
-      <p class="pg-sub">{{ rdvSvc.getAll().length }} rendez-vous enregistrés</p>
+      <p class="pg-sub">{{ totalRdv() }} rendez-vous enregistrés</p>
     </div>
     <button class="btn-cta" (click)="showAdd.set(!showAdd())">
       <div class="btn-cta-ico">
@@ -124,7 +124,12 @@ import { ToastService } from '../../../core/services/toast.service';
             <label class="fl">PATIENT</label>
             <div class="fi-wrap">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <input class="fi" type="text" [(ngModel)]="newRdv.patientName" placeholder="Nom complet"/>
+              <select class="fi" [(ngModel)]="newRdv.patientName" (change)="onPatientSelect()">
+  <option value="">-- Sélectionner un patient --</option>
+  @for (p of patientsSvc.patients(); track p.id) {
+    <option [value]="p.name">{{ p.name }}</option>
+  }
+</select>
             </div>
           </div>
           <div class="fg">
@@ -485,69 +490,152 @@ import { ToastService } from '../../../core/services/toast.service';
     @media (max-width:580px) { .fc-grid-3 { grid-template-columns:1fr; } .stats-strip { grid-template-columns:1fr; } }
   `]
 })
-export class RdvComponent {
+export class RdvComponent implements OnInit {
+
   rdvSvc = inject(RdvService);
-  toast  = inject(ToastService);
-
-  showAdd   = signal(false);
+  toast = inject(ToastService);
+  patientsSvc = inject(PatientsService);
+  rdvs = signal<any[]>([]);
+  showAdd = signal(false);
   activeTab = signal('all');
-  searchQ   = '';
+  searchQ = '';
 
-  newRdv = { patientName: '', patientPhone: '', date: '', time: '', type: 'Consultation' };
-
-  readonly tabs = [
-    { val: 'all',       label: 'Tous',       color: 'var(--P)' },
-    
-    { val: 'confirmed', label: 'Confirmés',  color: 'var(--em)' },
-    { val: 'done',      label: 'Terminés',   color: 'var(--violet)' },
-    { val: 'cancelled', label: 'Annulés',    color: 'var(--rose)' },
+  tabs = [
+    { label: 'Tous', val: 'all', color: '#1d5fe0' },
+    { label: 'Confirmés', val: 'confirmed', color: '#0eb88a' },
+    { label: 'En attente', val: 'pending', color: '#f0a020' },
+    { label: 'Annulés', val: 'cancelled', color: '#f0426a' }
   ];
 
-  // ══ COMPUTED STATS DYNAMIQUES ══
-  totalRdv     = computed(() => this.rdvSvc.getAll().length);
-  confirmedRdv = computed(() => this.rdvSvc.getAll().filter(r => r.status === 'confirmed').length);
-  pendingRdv   = computed(() => this.rdvSvc.getAll().filter(r => r.status === 'pending').length);
-  cancelledRdv = computed(() => this.rdvSvc.getAll().filter(r => r.status === 'cancelled').length);
+ newRdv = {
+  patientName:  '',
+  patientPhone: '',
+  patientId:    '',
+  date:         '',
+  time:         '',
+  type:         'Consultation',
+};
 
-  isSunday    = () => this.newRdv.date ? new Date(this.newRdv.date).getDay() === 0 : false;
-  onDateChange() { this.newRdv.time = ''; }
-  availableSlots = () => this.newRdv.date ? this.rdvSvc.getAvailableSlots(this.newRdv.date) : [];
+  ngOnInit() {
+    this.refresh();
+    this.patientsSvc.loadPatients();
+  }
 
+  refresh() {
+    this.rdvSvc.getAll().subscribe(data => {
+      this.rdvs.set(data);
+    });
+  }
+
+  // ===== STATS =====
+  totalRdv = computed(() => this.rdvs().length);
+
+  confirmedRdv = computed(() =>
+    this.rdvs().filter(r => r.status === 'confirmed').length
+  );
+
+  pendingRdv = computed(() =>
+    this.rdvs().filter(r => r.status === 'pending').length
+  );
+
+  cancelledRdv = computed(() =>
+    this.rdvs().filter(r => r.status === 'cancelled').length
+  );
+
+  // ===== FILTER =====
   filteredRdvs = computed(() => {
-    let l = this.rdvSvc.getAll();
-    if (this.activeTab() !== 'all') l = l.filter(r => r.status === this.activeTab());
-    if (this.searchQ.trim()) l = l.filter(r => r.patientName.toLowerCase().includes(this.searchQ.toLowerCase()));
-    return l.sort((a, b) => b.date.localeCompare(a.date));
+    let list = this.rdvs();
+
+    if (this.activeTab() !== 'all') {
+      list = list.filter(r => r.status === this.activeTab());
+    }
+
+    if (this.searchQ.trim()) {
+      list = list.filter(r =>
+        r.patientName.toLowerCase().includes(this.searchQ.toLowerCase())
+      );
+    }
+
+    return list;
   });
 
-  countByTab  = (t: string) => t === 'all' ? this.rdvSvc.getAll().length : this.rdvSvc.getAll().filter(r => r.status === t).length;
-  statusLabel = (s: string) => ({ confirmed: 'Confirmé', pending: 'En attente', done: 'Terminé', cancelled: 'Annulé' } as any)[s] ?? s;
-  getBadgeClass = (s: string) => ({ confirmed: 'badge-confirmed', pending: 'badge-pending', done: 'badge-done', cancelled: 'badge-cancelled' } as any)[s] ?? 'badge-done';
-  formatDate = (d: string) => { if (!d) return ''; return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+  // ===== HELPERS (FIX ERRORS) =====
 
-  getGrad(name: string): string {
-    const g = ['linear-gradient(135deg,#1d5fe0,#154dc8)', 'linear-gradient(135deg,#0891b2,#0e7490)', 'linear-gradient(135deg,#6366f1,#4f46e5)', 'linear-gradient(135deg,#0eb88a,#0d9a76)', 'linear-gradient(135deg,#f0426a,#c73055)', 'linear-gradient(135deg,#f0a020,#c8820a)'];
-    return g[(name.charCodeAt(0) + name.charCodeAt(name.length - 1)) % g.length];
+  countByTab = (val: string) =>
+    this.rdvs().filter(r => val === 'all' ? true : r.status === val).length;
+
+  formatDate = (d: string) => d;
+
+  getGrad = (name: string) => '#1d5fe0';
+
+  getBadgeClass = (status: string) => status;
+
+  statusLabel = (status: string) => status;
+
+  
+ confirm(id: number) {
+  this.rdvSvc.confirmAppointment(id).subscribe(() => {
+  this.refresh();
+  });
+}
+
+markAsDone(id: number) {
+  this.rdvSvc.markAppointmentAsDone(id).subscribe(() => {
+  this.refresh();
+  });
+}
+
+cancel(id: number) {
+  this.rdvSvc.cancelAppointment(id).subscribe(() => {
+  this.refresh();
+  });
+}
+onDateChange() {
+  this.newRdv.time = '';
+  if (!this.newRdv.date) return;
+
+  this.rdvSvc.getAvailableSlots(this.newRdv.date).subscribe((res: any) => {
+    this.slots.set(res.slots ?? res ?? []);
+  });
+}
+onPatientSelect() {
+  const selected = this.patientsSvc.patients()
+    .find((p: any) => p.name === this.newRdv.patientName);
+  if (selected) {
+    this.newRdv.patientPhone = (selected as any).tel ?? '';
+    this.newRdv.patientId   = (selected as any).id ?? '';
   }
+}
+isSunday() {
+  if (!this.newRdv.date) return false;
 
+  return new Date(this.newRdv.date).getDay() === 0;
+}
+
+slots = signal<any[]>([]);
+
+availableSlots() {
+  return this.slots();
+}
+  // ===== CREATE =====
   submitRdv() {
-    const result = this.rdvSvc.bookAppointment({ patientId: 'WALK_IN', patientName: this.newRdv.patientName, patientPhone: this.newRdv.patientPhone, date: this.newRdv.date, time: this.newRdv.time, type: this.newRdv.type, status: 'confirmed' });
-    if (result.success) { this.toast.success('RDV créé !', result.message); this.newRdv = { patientName: '', patientPhone: '', date: '', time: '', type: 'Consultation' }; this.showAdd.set(false); }
-    else { this.toast.error('Créneau indisponible', result.message); }
-  }
-  
-  confirm(id: string) { 
-    this.rdvSvc.confirmAppointment(id); 
-    this.toast.success('RDV confirmé !'); 
-  }
-  
-  markAsDone(id: string) {
-    this.rdvSvc.markAppointmentAsDone(id);
-    this.toast.success('Visite terminée !', 'Le rendez-vous a été marqué comme terminé');
-  }
-  
-  cancel(id: string)  { 
-    this.rdvSvc.cancelAppointment(id);  
-    this.toast.info('RDV annulé'); 
+    this.rdvSvc.create({
+      ...this.newRdv,
+      status: 'pending'
+    }).subscribe(() => {
+      this.toast.success('RDV créé !');
+
+      this.newRdv = {
+  patientName:  '',
+  patientPhone: '',
+  patientId:    '',
+  date:         '',
+  time:         '',
+  type:         'Consultation',
+};
+
+      this.showAdd.set(false);
+      this.refresh();
+    });
   }
 }

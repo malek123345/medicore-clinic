@@ -1,10 +1,12 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { PatientsService } from '../../../core/services/patients.service';
 import { FormsModule } from '@angular/forms';
 import { DossierService } from '../../../core/services/dossier.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
-
+import { OrdonnancesService } from '../../../core/services/ordonnances.service';
+import { Ordonnance } from '../../../core/models/ordonnance.model';
 @Component({
   selector: 'app-ordonnances',
   standalone: true,
@@ -50,14 +52,14 @@ import { ToastService } from '../../../core/services/toast.service';
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>
             Médicaments prescrits
           </div>
-          @for (med of detailOrd()!.medications; track med.name) {
+          @for (med of detailOrd()!.meds; track med.name) {
             <div class="detail-med-row">
               <div class="detail-med-num">{{ $index + 1 }}</div>
               <div class="detail-med-info">
                 <div class="detail-med-name">{{ med.name }}</div>
-                <div class="detail-med-sub">{{ med.dosage ?? med.dose }} · {{ med.freq }}</div>
+                <div class="detail-med-sub">{{ med.dose ?? med.dose }} · {{ med.freq }}</div>
               </div>
-              <div class="detail-med-dur">{{ med.duration ?? med.duree }}</div>
+              <div class="detail-med-dur">{{med.duree ?? med.duree }}</div>
             </div>
           }
           @if (detailOrd()!.notes) {
@@ -109,10 +111,14 @@ import { ToastService } from '../../../core/services/toast.service';
               <label class="fl">PATIENT</label>
               <div class="fi-wrap">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <select class="fi" [(ngModel)]="form.patientId" (change)="onPatientChange()">
-                  <option value="">-- Sélectionner un patient --</option>
-                  @for (p of patients; track p.id) { <option [value]="p.id">{{ p.name }}</option> }
-                </select>
+               <select class="fi" [(ngModel)]="form.patientId" (change)="onPatientChange()">
+  <option value="">-- Sélectionner un patient --</option>
+
+  @for (p of patients(); track p.id) {
+    <option [value]="p.id">{{ p.name }}</option>
+  }
+
+</select>
               </div>
             </div>
             <div class="fg">
@@ -213,12 +219,7 @@ import { ToastService } from '../../../core/services/toast.service';
       <button class="chip" [class.chip-on]="filterStatus()==='all'" (click)="filterStatus.set('all')">
         Toutes <span class="chip-count">{{ ordonnances().length }}</span>
       </button>
-      <button class="chip" [class.chip-on]="filterStatus()==='active'" (click)="filterStatus.set('active')">
-        <span class="chip-dot chip-dot-green"></span>Actives <span class="chip-count">{{ activeCount() }}</span>
-      </button>
-      <button class="chip" [class.chip-on]="filterStatus()==='expired'" (click)="filterStatus.set('expired')">
-        <span class="chip-dot chip-dot-red"></span>Expirées <span class="chip-count">{{ expiredCount() }}</span>
-      </button>
+      
     </div>
     <div class="result-count">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>
@@ -246,10 +247,7 @@ import { ToastService } from '../../../core/services/toast.service';
               {{ ord.date }}
             </div>
           </div>
-          <span class="badge" [class]="(ord.status ?? 'active') === 'active' ? 'badge-active' : 'badge-expired'">
-            <span class="badge-dot"></span>
-            {{ (ord.status ?? 'active') === 'active' ? 'Active' : 'Expirée' }}
-          </span>
+          
         </div>
 
         <div class="ord-divider"></div>
@@ -260,16 +258,16 @@ import { ToastService } from '../../../core/services/toast.service';
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>
             Médicaments prescrits
           </div>
-          @for (med of ord.medications.slice(0, 3); track med.name) {
+          @for (med of ord.meds.slice(0, 3); track med.name) {
             <div class="ord-med-row">
               <div class="ord-med-bullet"></div>
               <div class="ord-med-name">{{ med.name }}</div>
-              <span class="ord-med-tag">{{ med.dosage ?? med.dose }}</span>
-              <span class="ord-med-dur">{{ med.duration ?? med.duree }}</span>
+              <span class="ord-med-tag">{{ med.dose ?? med.dose }}</span>
+              <span class="ord-med-dur">{{ med.duree ?? med.duree }}</span>
             </div>
           }
-          @if (ord.medications.length > 3) {
-            <div class="ord-more-meds">+{{ ord.medications.length - 3 }} médicament(s) de plus</div>
+          @if (ord.meds.length > 3) {
+            <div class="ord-more-meds">+{{ ord.meds.length - 3 }} médicament(s) de plus</div>
           }
         </div>
 
@@ -527,10 +525,11 @@ import { ToastService } from '../../../core/services/toast.service';
   `]
 })
 export class OrdonnancesComponent {
-  dossier = inject(DossierService);
+  ordService = inject(OrdonnancesService);
   auth    = inject(AuthService);
   toast   = inject(ToastService);
-
+  patientsService = inject(PatientsService);
+patients = this.patientsService.patients.asReadonly();
   searchQ      = '';
   searchFocused = false;
   showAdd      = signal(false);
@@ -540,54 +539,9 @@ export class OrdonnancesComponent {
   toastMsg     = signal({ title: '', desc: '' });
 
   // ─── Data ───────────────────────────────────────────────────────────────────
-  ordonnances = signal<any[]>([
-    {
-      id: 'ORD-001', patientName: 'Karim Ayoub', patientId: 'P001',
-      date: '15 Avril 2025', status: 'active',
-      doctorName: 'Dr. Khaddar',
-      medications: [
-        { name: 'Doliprane 1000mg',   dosage: '3x/jour',        duration: '7 jours' },
-        { name: 'Amoxicilline 500mg', dosage: '2x/jour',        duration: '10 jours' },
-      ],
-      notes: 'Prendre avec de la nourriture. Éviter l\'alcool pendant le traitement.'
-    },
-    {
-      id: 'ORD-002', patientName: 'Sana Ben Ali', patientId: 'P002',
-      date: '12 Avril 2025', status: 'active',
-      doctorName: 'Dr. Khaddar',
-      medications: [
-        { name: 'Ventoline Spray',   dosage: '2 bouffées si nécessaire', duration: '30 jours' },
-        { name: 'Seretide 250',      dosage: '2x/jour',                  duration: '30 jours' },
-      ],
-      notes: 'Rincer la bouche après utilisation du Seretide.'
-    },
-    {
-      id: 'ORD-003', patientName: 'Mohamed Hedi', patientId: 'P003',
-      date: '08 Mars 2025', status: 'expired',
-      doctorName: 'Dr. Khaddar',
-      medications: [
-        { name: 'Aspirine 100mg', dosage: '1x/jour', duration: '30 jours' },
-      ],
-      notes: null
-    },
-    {
-      id: 'ORD-004', patientName: 'Fatma Ayari', patientId: 'P004',
-      date: '20 Avril 2025', status: 'active',
-      doctorName: 'Dr. Khaddar',
-      medications: [
-        { name: 'Levothyrox 50µg',         dosage: '1x matin à jeun',  duration: '90 jours' },
-        { name: 'Vitamine D 100000 UI',     dosage: '1 ampoule/mois',   duration: '3 mois'   },
-      ],
-      notes: 'Prendre Levothyrox 30 min avant le petit-déjeuner.'
-    },
-  ]);
+ ordonnances = this.ordService.ordonnances;
 
-  readonly patients = [
-    { id: 'P001', name: 'Karim Ayoub' },
-    { id: 'P002', name: 'Sana Ben Ali' },
-    { id: 'P003', name: 'Mohamed Hedi' },
-    { id: 'P004', name: 'Fatma Ayari' },
-  ];
+ 
 
   form = { patientId: '', patientName: '', date: new Date().toISOString().slice(0, 10), medications: [{ name: '', dose: '', freq: '', duree: '' }], notes: '' };
 
@@ -599,8 +553,8 @@ export class OrdonnancesComponent {
       const q = this.searchQ.toLowerCase();
       list = list.filter(o =>
         o.patientName.toLowerCase().includes(q) ||
-        o.id.toLowerCase().includes(q) ||
-        o.medications.some((m: any) => m.name.toLowerCase().includes(q))
+        o.id.toString().toLowerCase().includes(q) ||
+        o.meds.some((m: any) => m.name.toLowerCase().includes(q))
       );
     }
     return list;
@@ -620,8 +574,14 @@ export class OrdonnancesComponent {
     ];
     return g[(name.charCodeAt(0) + (name.charCodeAt(name.length - 1) || 0)) % g.length];
   }
-
-  onPatientChange() { this.form.patientName = this.patients.find(p => p.id === this.form.patientId)?.name ?? ''; }
+  ngOnInit() {
+  this.ordService.load();
+  this.patientsService.loadPatients();
+}
+  onPatientChange() {
+  this.form.patientName =
+    this.patients().find(p => p.id === this.form.patientId)?.name ?? '';
+}
   addMed()          { this.form.medications.push({ name: '', dose: '', freq: '', duree: '' }); }
   removeMed(i: number) { if (this.form.medications.length > 1) this.form.medications.splice(i, 1); }
 
@@ -629,13 +589,21 @@ export class OrdonnancesComponent {
     const meds = this.form.medications.filter(m => m.name.trim());
     if (!meds.length) return;
     const id = 'ORD-' + String(this.ordonnances().length + 1).padStart(3, '0');
-    this.ordonnances.update(list => [...list, {
-      id, patientId: this.form.patientId, patientName: this.form.patientName,
-      date: this.form.date, status: 'active',
-      doctorName: this.auth.user()?.name ?? 'Dr. Khaddar',
-      medications: meds.map(m => ({ name: m.name, dosage: m.dose, duration: m.duree, freq: m.freq })),
-      notes: this.form.notes || null
-    }]);
+    this.ordService.add({
+  id: this.ordService.ordonnances().length + 1,
+  patientId: this.form.patientId,
+  patientName: this.form.patientName,
+  date: this.form.date,
+  status: 'active',
+  doctorName: this.auth.user()?.name ?? 'Dr. Khaddar',
+  meds: meds.map(m => ({
+    name: m.name,
+    dose: m.dose,
+    freq: m.freq,
+    duree: m.duree
+  })),
+  notes: this.form.notes || null
+});
     this.showAdd.set(false);
     this.form = { patientId: '', patientName: '', date: new Date().toISOString().slice(0, 10), medications: [{ name: '', dose: '', freq: '', duree: '' }], notes: '' };
     this.notify('Ordonnance créée !', `Ordonnance ${id} enregistrée avec succès.`);

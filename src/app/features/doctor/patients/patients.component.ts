@@ -3,7 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DossierService } from '../../../core/services/dossier.service';
 import { RdvService } from '../../../core/services/rdv.service';
-
+import { PatientsService } from '../../../core/services/patients.service';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { DocumentsService } from '../../../core/services/documents.service';
+import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-patients',
   standalone: true,
@@ -29,10 +33,7 @@ import { RdvService } from '../../../core/services/rdv.service';
   @if (showModal()) {
     <div class="modal-veil" (click)="closeModal()">
       <div class="modal-box" (click)="$event.stopPropagation()">
-        <!-- Rainbow top stripe -->
         <div class="modal-rainbow"></div>
-
-        <!-- Header -->
         <div class="modal-hd">
           <div class="modal-hd-left">
             <div class="modal-ico">
@@ -53,21 +54,18 @@ import { RdvService } from '../../../core/services/rdv.service';
           </button>
         </div>
 
-        <!-- Avatar preview -->
         <div class="modal-avatar-preview">
           <div class="map-av" [style.background]="newPtName ? getGrad(newPtName) : 'linear-gradient(135deg,#e2e9f8,#c8d5ee)'">
             {{ getInitials(newPtName) }}
           </div>
           <div class="map-info">
             <div class="map-name">{{ newPtName || 'Nom du patient' }}</div>
-            <div class="map-id">PAT-{{ String(patients().length + 1).padStart(3,'0') }}</div>
+            <div class="map-id">PAT-{{ String(patientsSvc.patients().length + 1).padStart(3,'0') }}</div>
             @if (newPt.blood) { <span class="map-blood">{{ newPt.blood }}</span> }
           </div>
         </div>
 
-        <!-- Form -->
         <div class="modal-body">
-          <!-- Nom complet -->
           <div class="form-section">
             <div class="form-section-title">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -99,35 +97,6 @@ import { RdvService } from '../../../core/services/rdv.service';
                 </div>
               </div>
               <div class="fg">
-                <label class="fl">GROUPE SANGUIN *</label>
-                <div class="fi-wrap fi-wrap-icon" [class.fi-focused]="focusedField==='blood'">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-                  <select class="fi" [(ngModel)]="newPt.blood"
-                    (focus)="focusedField='blood'" (blur)="focusedField=''">
-                    <option value="">-- Sélectionner --</option>
-                    @for (b of bloodGroups; track b) { <option [value]="b">{{ b }}</option> }
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Contact -->
-          <div class="form-section">
-            <div class="form-section-title">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.11h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16c.003.307.003.613 0 .92z"/></svg>
-              Contact
-            </div>
-            <div class="form-row-2">
-              <div class="fg">
-                <label class="fl">TÉLÉPHONE</label>
-                <div class="fi-wrap fi-wrap-icon" [class.fi-focused]="focusedField==='phone'">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                  <input class="fi" type="tel" [(ngModel)]="newPt.phone" placeholder="+216 XX XXX XXX"
-                    (focus)="focusedField='phone'" (blur)="focusedField=''"/>
-                </div>
-              </div>
-              <div class="fg">
                 <label class="fl">EMAIL</label>
                 <div class="fi-wrap fi-wrap-icon" [class.fi-focused]="focusedField==='email'">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -136,6 +105,25 @@ import { RdvService } from '../../../core/services/rdv.service';
                 </div>
               </div>
             </div>
+            <div class="form-row-2">
+              <div class="fg">
+                <label class="fl">PASSWORD *</label>
+                <div class="fi-wrap">
+                  <input class="fi" type="password" [(ngModel)]="newPt.password" placeholder="Mot de passe patient"/>
+                </div>
+              </div>
+              <div class="fg">
+                <label class="fl">TÉLÉPHONE</label>
+                <div class="fi-wrap fi-wrap-icon" [class.fi-focused]="focusedField==='phone'">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  <input class="fi" type="tel" [(ngModel)]="newPt.phone" placeholder="+216 XX XXX XXX"
+                    (focus)="focusedField='phone'" (blur)="focusedField=''"/>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
             <div class="fg">
               <label class="fl">ADRESSE</label>
               <div class="fi-wrap fi-wrap-icon" [class.fi-focused]="focusedField==='address'">
@@ -146,7 +134,6 @@ import { RdvService } from '../../../core/services/rdv.service';
             </div>
           </div>
 
-          <!-- Validation error -->
           @if (formError()) {
             <div class="form-error">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -155,7 +142,6 @@ import { RdvService } from '../../../core/services/rdv.service';
           }
         </div>
 
-        <!-- Footer -->
         <div class="modal-ft">
           <div class="modal-ft-req">* Champs obligatoires</div>
           <div class="modal-ft-btns">
@@ -173,7 +159,7 @@ import { RdvService } from '../../../core/services/rdv.service';
 
   <!-- ══ DOSSIER MODAL ══ -->
   @if (dossierPt()) {
-    <div class="modal-veil" (click)="dossierPt.set(null)">
+    <div class="modal-veil" (click)="closeDossier()">
       <div class="modal-box dossier-box" (click)="$event.stopPropagation()">
         <div class="modal-rainbow"></div>
         <div class="modal-hd">
@@ -181,47 +167,84 @@ import { RdvService } from '../../../core/services/rdv.service';
             <div class="dossier-av" [style.background]="dossierPt()!.grad">{{ dossierPt()!.ini }}</div>
             <div>
               <div class="modal-title">{{ dossierPt()!.name }}</div>
-              <div class="modal-sub">{{ dossierPt()!.patientId }} · Groupe {{ dossierPt()!.blood }}</div>
+              <div class="modal-sub">{{ dossierPt()!.patientId }}</div>
             </div>
           </div>
-          <button class="modal-x" (click)="dossierPt.set(null)">
+          <button class="modal-x" (click)="closeDossier()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <div class="dossier-body">
-          <!-- Stats -->
-          <div class="dossier-stats">
-            <div class="ds-stat"><div class="ds-val">{{ getRdvCount(dossierPt()!.id) }}</div><div class="ds-lbl">RDV total</div></div>
-            <div class="ds-sep"></div>
-            <div class="ds-stat"><div class="ds-val">{{ getOrdCount(dossierPt()!.id) }}</div><div class="ds-lbl">Ordonnances</div></div>
-            <div class="ds-sep"></div>
-            <div class="ds-stat"><div class="ds-val">{{ getFileCount(dossierPt()!.id) }}</div><div class="ds-lbl">Fichiers</div></div>
-          </div>
-          <!-- Ordonnances -->
-          <div class="dossier-section-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>
-            Ordonnances récentes
-          </div>
-          @for (ord of dossier.getOrdonnancesForPatient(dossierPt()!.id).slice(0,4); track ord.id) {
-            <div class="dossier-ord-row">
-              <div class="dossier-ord-dot"></div>
-              <div class="dossier-ord-info">
-                <div class="dossier-ord-meds">{{ getMedNames(ord.medications) }}</div>
-                <div class="dossier-ord-date">{{ ord.date }}</div>
-              </div>
-              <span class="badge badge-active" style="font-size:9.5px"><span class="badge-dot"></span>Active</span>
-            </div>
-          }
-          @if (dossier.getOrdonnancesForPatient(dossierPt()!.id).length === 0) {
-            <div class="dossier-empty">Aucune ordonnance enregistrée pour ce patient</div>
-          }
-        </div>
-        <div class="modal-ft" style="justify-content:flex-end">
-          <button class="btn-cancel" (click)="dossierPt.set(null)">Fermer</button>
-          <button class="btn-rdv" (click)="dossierPt.set(null)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-            Nouveau RDV
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:8px;padding:14px 26px;border-bottom:1px solid var(--brd)">
+          @if (auth.user()?.role === 'Doctor') {
+  <button class="dossier-tab" [class.dossier-tab-on]="dossierTab()==='ords'" (click)="dossierTab.set('ords')">
+    💊 Ordonnances <span class="dtab-count">{{ dossierOrds().length }}</span>
+  </button>
+}
+          <button class="dossier-tab" [class.dossier-tab-on]="dossierTab()==='files'" (click)="reloadFiles()">
+            📁 Fichiers <span class="dtab-count">{{ dossierFiles().length }}</span>
           </button>
+        </div>
+
+        <!-- Body -->
+        <div class="dossier-body">
+
+          <!-- ORDONNANCES TAB -->
+          @if (dossierTab() === 'ords') {
+            @if (loadingDossier()) {
+              <div class="dossier-loading">Chargement...</div>
+            } @else if (dossierOrds().length === 0) {
+              <div class="dossier-empty">Aucune ordonnance enregistrée</div>
+            } @else {
+              @for (ord of dossierOrds(); track ord.id) {
+                <div class="dossier-ord-row">
+                  <div class="dossier-ord-dot"></div>
+                  <div class="dossier-ord-info">
+                    <div class="dossier-ord-meds">{{ getMedNames(ord.meds) }}</div>
+                    <div class="dossier-ord-date">{{ ord.date }}</div>
+                  </div>
+                  <span class="ord-badge" [class.ord-active]="ord.status==='active'">
+                    {{ ord.status === 'active' ? 'Active' : 'Expirée' }}
+                  </span>
+                </div>
+              }
+            }
+          }
+
+          <!-- FILES TAB -->
+          @if (dossierTab() === 'files') {
+            <div class="dossier-upload" (click)="docFileInput.click()">
+              <input #docFileInput type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
+                (change)="uploadDocForPatient($event)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Envoyer un fichier au patient
+            </div>
+            @if (dossierFiles().length === 0) {
+              <div class="dossier-empty">Aucun fichier disponible</div>
+            } @else {
+              @for (file of dossierFiles(); track file.id) {
+                <div class="dossier-file-row">
+                  <div class="dossier-file-ico">
+                    @if (file.fileType?.includes('pdf')) { 📄 } @else { 🖼️ }
+                  </div>
+                  <div class="dossier-file-info">
+                    <div class="dossier-file-name">{{ file.fileName }}</div>
+                    <div class="dossier-file-meta">{{ docsSvc.formatSize(file.fileSize) }}</div>
+                  </div>
+                  <a [href]="'http://localhost:5000'+file.filePath" target="_blank" class="dossier-file-btn">Voir</a>
+<button class="dossier-file-del" (click)="deleteDocForPatient(file.id)">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+</button>
+                </div>
+              }
+            }
+          }
+
+        </div>
+
+        <div class="modal-ft" style="justify-content:flex-end">
+          <button class="btn-cancel" (click)="closeDossier()">Fermer</button>
         </div>
       </div>
     </div>
@@ -239,7 +262,7 @@ import { RdvService } from '../../../core/services/rdv.service';
         </svg>
         Patients
       </h1>
-      <p class="pg-sub">{{ patients().length }} patients enregistrés</p>
+      <p class="pg-sub">{{ patientsSvc.patients().length }} patients enregistrés</p>
     </div>
     <button class="btn-cta" (click)="showModal.set(true)">
       <div class="btn-cta-ico">
@@ -255,20 +278,22 @@ import { RdvService } from '../../../core/services/rdv.service';
     <div class="search-wrap" [class.search-on]="searchFocused">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input class="search-inp"
-        [(ngModel)]="searchQ"
+        [ngModel]="searchQ()" (ngModelChange)="searchQ.set($event)"
         (ngModelChange)="onSearch()"
         (focus)="searchFocused=true"
         (blur)="searchFocused=false"
         placeholder="Rechercher un patient par nom..."/>
-      @if (searchQ) {
+     @if (searchQ()) {
         <button class="search-clr" (click)="clearSearch()">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       }
     </div>
-    <div class="search-result-info" *ngIf="searchQ">
-      {{ filteredPatients().length }} résultat(s) pour « {{ searchQ }} »
-    </div>
+   @if (searchQ()) {
+      <div class="search-result-info">
+        {{ filteredPatients().length }} résultat(s) pour « {{ searchQ() }} »
+      </div>
+    }
     <div class="view-switcher">
       <button class="vs-btn" [class.vs-on]="viewMode()==='grid'" (click)="viewMode.set('grid')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
@@ -327,15 +352,10 @@ import { RdvService } from '../../../core/services/rdv.service';
           </div>
         </div>
 
-        <!-- ══ ALL BUTTONS FUNCTIONAL ══ -->
         <div class="pt-card-ft">
-          <button class="pt-action" (click)="actionRdv(p, $event)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            RDV
-          </button>
-          <button class="pt-action" (click)="actionOrd(p, $event)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>
-            Ordonnance
+          <button class="pt-action" (click)="actionDelete(p, $event)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Supprimer
           </button>
           <button class="pt-action pt-action-primary" (click)="openDossier(p, $event)">
             Dossier complet
@@ -343,8 +363,7 @@ import { RdvService } from '../../../core/services/rdv.service';
           </button>
         </div>
 
-        <!-- Expanded ordonnances -->
-        @if (selectedPt()?.id === p.id) {
+        @if (selectedPt()?.id === p.id && auth.user()?.role === 'Doctor') {
           <div class="pt-detail" (click)="$event.stopPropagation()">
             <div class="pt-detail-strip"></div>
             <div class="pt-detail-body">
@@ -352,18 +371,19 @@ import { RdvService } from '../../../core/services/rdv.service';
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>
                 Dernières ordonnances
               </div>
-              @for (ord of dossier.getOrdonnancesForPatient(p.id).slice(0,3); track ord.id) {
-                <div class="pt-ord-row">
-                  <div class="pt-ord-dot"></div>
-                  <div class="pt-ord-info">
-                    <div class="pt-ord-meds">{{ getMedNames(ord.medications) }}</div>
-                    <div class="pt-ord-date">{{ ord.date }}</div>
-                  </div>
-                  <span class="badge badge-confirmed" style="font-size:9.5px;padding:3px 8px"><span class="badge-dot"></span>Active</span>
-                </div>
-              }
               @if (dossier.getOrdonnancesForPatient(p.id).length === 0) {
                 <div class="pt-no-ord">Aucune ordonnance enregistrée</div>
+              } @else {
+                @for (ord of dossier.getOrdonnancesForPatient(p.id).slice(0,3); track ord.id) {
+                  <div class="pt-ord-row">
+                    <div class="pt-ord-dot"></div>
+                    <div class="pt-ord-info">
+                      <div class="pt-ord-meds">{{ getMedNames(ord.medications) }}</div>
+                      <div class="pt-ord-date">{{ ord.date }}</div>
+                    </div>
+                    <span class="badge badge-confirmed" style="font-size:9.5px;padding:3px 8px"><span class="badge-dot"></span>Active</span>
+                  </div>
+                }
               }
             </div>
           </div>
@@ -376,9 +396,9 @@ import { RdvService } from '../../../core/services/rdv.service';
         <div class="empty-ico">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         </div>
-        <div class="empty-title">{{ searchQ ? 'Aucun résultat pour « ' + searchQ + ' »' : 'Aucun patient enregistré' }}</div>
-        <div class="empty-sub">{{ searchQ ? 'Essayez un autre terme de recherche' : 'Ajoutez votre premier patient' }}</div>
-        @if (searchQ) {
+        <div class="empty-title">{{ searchQ() ? 'Aucun résultat pour « ' + searchQ() + ' »' : 'Aucun patient enregistré' }}</div>
+<div class="empty-sub">{{ searchQ() ? 'Essayez un autre terme' : 'Ajoutez votre premier patient' }}</div>
+@if (searchQ()) {
           <button class="empty-btn" (click)="clearSearch()">Effacer la recherche</button>
         } @else {
           <button class="btn-cta btn-cta-sm" (click)="showModal.set(true)">
@@ -390,13 +410,14 @@ import { RdvService } from '../../../core/services/rdv.service';
     }
   </div>
 
-  <!-- ══ ACTION TOAST ══ -->
+  <!-- ══ TOAST ══ -->
   @if (showActionToast()) {
     <div class="toast-notif">
       <div class="toast-ico-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
       <div><div class="toast-title">{{ actionToastMsg().title }}</div><div class="toast-desc">{{ actionToastMsg().desc }}</div></div>
     </div>
   }
+
 </div>
   `,
   styles: [`
@@ -406,7 +427,7 @@ import { RdvService } from '../../../core/services/rdv.service';
     .page-wrap { position:relative;min-height:100%;display:flex;flex-direction:column;gap:22px;animation:pgIn .55s cubic-bezier(.22,1,.36,1) both; }
     @keyframes pgIn { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
 
-    /* ══ BG ══ */
+    /* BG */
     .page-bg { position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden; }
     .pg-orb { position:absolute;border-radius:50%;filter:blur(85px); }
     .pg-orb1 { width:560px;height:560px;top:-130px;right:4%;background:radial-gradient(circle,rgba(29,95,224,0.12),rgba(124,58,237,0.06) 60%,transparent 75%);animation:o1 22s ease-in-out infinite; }
@@ -415,18 +436,17 @@ import { RdvService } from '../../../core/services/rdv.service';
     @keyframes o1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-45px,35px) scale(1.05)} 66%{transform:translate(22px,-28px) scale(.96)} }
     @keyframes o2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(38px,-38px) scale(1.07)} }
     @keyframes o3 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-26px,26px) scale(1.08)} }
-    .pg-grid { position:absolute;inset:0;background-image:linear-gradient(rgba(29,95,224,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(29,95,224,0.03) 1px,transparent 1px);background-size:60px 60px;animation:gridMove 60s linear infinite; }
-    @keyframes gridMove { from{background-position:0 0} to{background-position:60px 60px} }
+    .pg-grid { position:absolute;inset:0;background-image:linear-gradient(rgba(29,95,224,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(29,95,224,0.03) 1px,transparent 1px);background-size:60px 60px; }
     .pg-ecg { position:absolute;bottom:50px;left:0;width:100%;height:60px;opacity:.07; }
-    .pg-ecg-line { fill:none;stroke:var(--P);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2400;stroke-dashoffset:2400;animation:ecgA 6s ease-in-out infinite; }
+    .pg-ecg-line { fill:none;stroke:var(--P);stroke-width:1.5;stroke-linecap:round;stroke-dasharray:2400;stroke-dashoffset:2400;animation:ecgA 6s ease-in-out infinite; }
     @keyframes ecgA { 0%{stroke-dashoffset:2400;opacity:0} 12%{opacity:1} 85%{stroke-dashoffset:0;opacity:.85} 100%{stroke-dashoffset:0;opacity:0} }
     .cross-float { position:absolute;color:var(--P);opacity:.05;font-size:18px;animation:cfloat 15s ease-in-out infinite;user-select:none; }
-    .cf1 { top:11%;right:9%;font-size:24px;animation-duration:17s; }
-    .cf2 { top:58%;right:28%;font-size:16px;animation-duration:13s;animation-delay:-5s; }
-    .cf3 { top:32%;left:14%;font-size:20px;animation-duration:19s;animation-delay:-8s; }
+    .cf1{top:11%;right:9%;font-size:24px;animation-duration:17s}
+    .cf2{top:58%;right:28%;font-size:16px;animation-duration:13s;animation-delay:-5s}
+    .cf3{top:32%;left:14%;font-size:20px;animation-duration:19s;animation-delay:-8s}
     @keyframes cfloat { 0%,100%{transform:translateY(0) rotate(0)} 25%{transform:translateY(-18px) rotate(12deg)} 75%{transform:translateY(18px) rotate(-12deg)} }
 
-    /* ══ HEADER ══ */
+    /* HEADER */
     .pg-hd { position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap; }
     .pg-eyebrow { display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;color:var(--txt4);text-transform:uppercase;letter-spacing:.1em;margin-bottom:9px; }
     .pg-live-dot { width:8px;height:8px;border-radius:50%;background:var(--em);animation:ldot 2.8s ease-in-out infinite;flex-shrink:0; }
@@ -434,56 +454,52 @@ import { RdvService } from '../../../core/services/rdv.service';
     .pg-title { display:flex;align-items:center;gap:12px;font-size:28px;font-weight:900;color:var(--txt);letter-spacing:-1.2px;margin:0 0 6px; }
     .pg-title svg { color:var(--P); }
     .pg-sub { font-size:13px;color:var(--txt4);margin:0; }
-
-    /* ══ CTA ══ */
+     .dossier-file-del { width:30px;height:30px;border-radius:8px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);color:#dc2626;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .18s;flex-shrink:0; }
+.dossier-file-del:hover { background:rgba(220,38,38,.15);transform:scale(1.1); }
+    /* CTA */
     .btn-cta { position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:11px;padding:12px 24px;border-radius:15px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--P),var(--violet));color:white;font-size:14px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;box-shadow:0 8px 28px rgba(29,95,224,.4),inset 0 1px 0 rgba(255,255,255,.2);transition:all .25s cubic-bezier(.34,1.56,.64,1); }
     .btn-cta:hover { transform:translateY(-3px) scale(1.02);box-shadow:0 12px 36px rgba(29,95,224,.5); }
     .btn-cta-sm { padding:10px 20px;font-size:13px; }
-    .btn-cta-ico { width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;animation:iconP 2.5s ease-in-out infinite; }
+    .btn-cta-ico { width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center; }
     .btn-cta-ico-sm { width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center; }
-    @keyframes iconP { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
-    .btn-cta-shine,.btn-save-shine { position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transition:left .5s; }
-    .btn-cta:hover .btn-cta-shine,.btn-save:hover .btn-save-shine { left:100%; }
+    .btn-cta-shine { position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transition:left .5s; }
+    .btn-cta:hover .btn-cta-shine { left:100%; }
 
-    /* ══ TOP BAR ══ */
+    /* TOP BAR */
     .top-bar { position:relative;z-index:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
     .search-wrap { display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:14px;background:var(--glass);border:1.5px solid var(--gbrd);flex:1;max-width:400px;backdrop-filter:blur(14px);transition:all .25s;color:var(--txt4); }
-    .search-wrap.search-on,.search-wrap:focus-within { border-color:var(--P);box-shadow:0 0 0 4px rgba(29,95,224,.1),0 4px 16px rgba(29,95,224,.1);transform:translateY(-1px); }
+    .search-wrap.search-on,.search-wrap:focus-within { border-color:var(--P);box-shadow:0 0 0 4px rgba(29,95,224,.1);transform:translateY(-1px); }
     .search-inp { border:none;background:transparent;outline:none;font-size:13.5px;color:var(--txt2);width:100%;font-family:'Plus Jakarta Sans',sans-serif; }
     .search-inp::placeholder { color:var(--txt4); }
     .search-clr { width:22px;height:22px;border-radius:50%;background:var(--bg2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt4);transition:all .2s; }
     .search-clr:hover { background:rgba(240,66,106,.12);color:var(--rose);transform:rotate(90deg); }
-    .search-result-info { font-size:12px;font-weight:600;color:var(--P);background:var(--Pl2);padding:6px 13px;border-radius:99px;border:1px solid rgba(29,95,224,.2);animation:fadeIn .2s ease; }
-    @keyframes fadeIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:none} }
+    .search-result-info { font-size:12px;font-weight:600;color:var(--P);background:var(--Pl2);padding:6px 13px;border-radius:99px;border:1px solid rgba(29,95,224,.2); }
     .view-switcher { display:flex;gap:4px;background:var(--glass);border:1.5px solid var(--gbrd);border-radius:12px;padding:4px;backdrop-filter:blur(14px);margin-left:auto; }
     .vs-btn { display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;border:none;background:transparent;color:var(--txt3);font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s; }
     .vs-on { background:var(--Pl2);color:var(--P);box-shadow:0 2px 8px rgba(29,95,224,.15); }
 
-    /* ══ GRIDS ══ */
+    /* GRID */
     .pts-grid { position:relative;z-index:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px; }
-    .pts-list { position:relative;z-index:1;display:flex;flex-direction:column;gap:14px; }
+    .pts-list  { position:relative;z-index:1;display:flex;flex-direction:column;gap:14px; }
 
-    /* ══ PATIENT CARD ══ */
+    /* PATIENT CARD */
     .pt-card { position:relative;overflow:hidden;padding:22px;border-radius:20px;background:var(--glass);backdrop-filter:blur(18px);border:1.5px solid var(--gbrd);box-shadow:0 4px 20px rgba(0,0,0,.04);cursor:pointer;transition:all .3s cubic-bezier(.34,1.56,.64,1);animation:cardIn .6s cubic-bezier(.34,1.56,.64,1) both; }
     @keyframes cardIn { from{opacity:0;transform:translateY(24px) scale(.95)} to{opacity:1;transform:none} }
     .pt-card:hover { transform:translateY(-6px) scale(1.01);box-shadow:0 14px 44px rgba(29,95,224,.18),0 4px 12px rgba(0,0,0,.08);border-color:rgba(29,95,224,.35); }
     .pt-selected { border-color:rgba(29,95,224,.5)!important;box-shadow:0 14px 44px rgba(29,95,224,.25),0 0 0 4px rgba(29,95,224,.12)!important; }
-    .pt-list-card { flex-direction:row;align-items:center;gap:18px; }
     .pt-shine { position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent); }
     .pt-hover-glow { position:absolute;top:50%;left:50%;width:85%;height:85%;background:radial-gradient(circle,rgba(29,95,224,.04),transparent 70%);transform:translate(-50%,-50%);pointer-events:none;opacity:0;transition:opacity .3s; }
     .pt-card:hover .pt-hover-glow { opacity:1; }
-
     .pt-card-top { display:flex;align-items:center;gap:16px;margin-bottom:18px; }
     .pt-av-wrap { position:relative;flex-shrink:0; }
     .pt-av { width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:white;box-shadow:0 8px 24px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.2);transition:all .3s; }
-    .pt-card:hover .pt-av { transform:scale(1.08) rotate(3deg);box-shadow:0 12px 32px rgba(0,0,0,.25); }
+    .pt-card:hover .pt-av { transform:scale(1.08) rotate(3deg); }
     .pt-av-ring { position:absolute;inset:-4px;border-radius:18px;border:2px solid rgba(255,255,255,.25);animation:ringP 3s ease-in-out infinite; }
     @keyframes ringP { 0%,100%{transform:scale(1);opacity:.3} 50%{transform:scale(1.05);opacity:.55} }
-    .pt-blood { position:absolute;bottom:-7px;right:-7px;font-size:9px;font-weight:800;background:var(--bg3);color:var(--P);border:2px solid var(--brd2);border-radius:99px;padding:2px 6px;box-shadow:0 2px 8px rgba(0,0,0,.1); }
+    .pt-blood { position:absolute;bottom:-7px;right:-7px;font-size:9px;font-weight:800;background:var(--bg3);color:var(--P);border:2px solid var(--brd2);border-radius:99px;padding:2px 6px; }
     .pt-name { font-size:15.5px;font-weight:800;color:var(--txt);letter-spacing:-.3px; }
     .pt-pid { font-size:11.5px;color:var(--txt4);font-weight:600;margin-top:3px; }
     .pt-id-info { flex:1;min-width:0; }
-
     .badge { display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:5px 11px;border-radius:99px;white-space:nowrap; }
     .badge-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0;animation:bdot 2.2s ease-in-out infinite; }
     @keyframes bdot { 0%,100%{transform:scale(1)} 50%{transform:scale(1.25)} }
@@ -491,29 +507,24 @@ import { RdvService } from '../../../core/services/rdv.service';
     .badge-confirmed .badge-dot { background:#0eb88a;box-shadow:0 0 8px rgba(14,184,138,.6); }
     .badge-active { background:rgba(29,95,224,.12);color:var(--P);border:1px solid rgba(29,95,224,.25); }
     .badge-active .badge-dot { background:var(--P);box-shadow:0 0 8px rgba(29,95,224,.6); }
-
-    .pt-stats-row { display:flex;align-items:center;background:var(--Pl);border:1px solid var(--brd);border-radius:13px;padding:14px;margin-bottom:16px;transition:all .25s; }
-    .pt-card:hover .pt-stats-row { background:rgba(29,95,224,.08);border-color:rgba(29,95,224,.2); }
+    .pt-stats-row { display:flex;align-items:center;background:var(--Pl);border:1px solid var(--brd);border-radius:13px;padding:14px;margin-bottom:16px; }
     .pt-stat { flex:1;text-align:center; }
     .pt-stat-val { font-size:24px;font-weight:900;color:var(--P);letter-spacing:-1.2px;line-height:1; }
     .pt-stat-lbl { font-size:10.5px;color:var(--txt4);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:.05em; }
     .pt-stat-sep { width:1px;height:36px;background:var(--brd2); }
-
     .pt-health { margin-bottom:18px; }
     .pt-health-hd { display:flex;align-items:center;justify-content:space-between;margin-bottom:7px; }
     .pt-health-lbl { font-size:11px;font-weight:700;color:var(--txt4);text-transform:uppercase;letter-spacing:.06em; }
     .pt-health-val { font-size:12px;font-weight:800; }
     .pt-health-track { height:6px;background:var(--brd2);border-radius:99px;overflow:hidden;position:relative; }
-    .pt-health-fill { height:100%;border-radius:99px;transition:width 1.5s cubic-bezier(.22,1,.36,1);position:relative;overflow:hidden; }
+    .pt-health-fill { height:100%;border-radius:99px;transition:width 1.5s cubic-bezier(.22,1,.36,1); }
     .pt-health-shimmer { position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:shimmer 2.8s ease-in-out infinite; }
     @keyframes shimmer { 0%{left:-100%} 100%{left:100%} }
-
     .pt-card-ft { display:flex;align-items:center;gap:8px;padding-top:4px; }
     .pt-action { display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;border:1.5px solid var(--brd);background:var(--bg2);color:var(--txt3);font-size:12px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .22s; }
-    .pt-action:hover { border-color:var(--P);color:var(--P);background:var(--Pl);transform:translateY(-2px);box-shadow:0 4px 12px rgba(29,95,224,.15); }
+    .pt-action:hover { border-color:var(--rose);color:var(--rose);background:rgba(240,66,106,.06);transform:translateY(-2px); }
     .pt-action-primary { margin-left:auto;background:var(--Pl2);color:var(--P);border-color:rgba(29,95,224,.25); }
     .pt-action-primary:hover { background:linear-gradient(135deg,var(--P),var(--violet));color:white;border-color:var(--P);box-shadow:0 6px 18px rgba(29,95,224,.3); }
-
     .pt-detail { margin-top:18px;border-radius:15px;overflow:hidden;animation:detIn .35s cubic-bezier(.34,1.56,.64,1); }
     @keyframes detIn { from{opacity:0;transform:translateY(12px) scale(.96)} to{opacity:1;transform:none} }
     .pt-detail-strip { height:4px;background:linear-gradient(90deg,var(--P),var(--violet)); }
@@ -527,153 +538,143 @@ import { RdvService } from '../../../core/services/rdv.service';
     .pt-ord-date { font-size:11px;color:var(--txt4);margin-top:2px; }
     .pt-no-ord { font-size:13px;color:var(--txt4);padding:10px 0;text-align:center; }
 
-    /* ══ EMPTY ══ */
-    .empty-card { display:flex;flex-direction:column;align-items:center;gap:16px;padding:70px;border-radius:22px;background:var(--glass);backdrop-filter:blur(18px);border:1.5px dashed var(--gbrd);text-align:center;grid-column:1/-1;animation:emptyIn .6s cubic-bezier(.34,1.56,.64,1); }
-    @keyframes emptyIn { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
-    .empty-ico { width:70px;height:70px;border-radius:20px;background:var(--Pl);color:var(--P);display:flex;align-items:center;justify-content:center;animation:emptyFloat 3.5s ease-in-out infinite; }
-    @keyframes emptyFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    /* EMPTY */
+    .empty-card { display:flex;flex-direction:column;align-items:center;gap:16px;padding:70px;border-radius:22px;background:var(--glass);backdrop-filter:blur(18px);border:1.5px dashed var(--gbrd);text-align:center;grid-column:1/-1; }
+    .empty-ico { width:70px;height:70px;border-radius:20px;background:var(--Pl);color:var(--P);display:flex;align-items:center;justify-content:center; }
     .empty-title { font-size:17px;font-weight:800;color:var(--txt); }
     .empty-sub { font-size:13.5px;color:var(--txt4); }
     .empty-btn { padding:10px 20px;border-radius:11px;background:var(--bg2);border:1.5px solid var(--brd);color:var(--txt3);font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s; }
     .empty-btn:hover { border-color:var(--P);color:var(--P); }
 
-    /* ══ MODAL ══ */
-    .modal-veil { position:fixed;inset:0;z-index:8000;background:rgba(220, 228, 236, 0.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:10px;animation:vIn .22s ease; }
+    /* MODAL */
+    .modal-veil { position:fixed;inset:0;z-index:8000;background:rgba(220,228,236,0.55);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:10px;animation:vIn .22s ease; }
     @keyframes vIn { from{opacity:0} to{opacity:1} }
-    .modal-box { background:var(--glass);backdrop-filter:blur(32px) saturate(180%);-webkit-backdrop-filter:blur(32px) saturate(180%);border:1.5px solid var(--gbrd);border-radius:24px;box-shadow:0 28px 80px rgba(0,0,0,.28);width:100%;max-width:580px;max-height:90vh;overflow-y:auto;animation:mPop .38s cubic-bezier(.34,1.56,.64,1);position:relative; }
-    .dossier-box { max-width:540px; }
+    .modal-box { background:var(--glass);backdrop-filter:blur(32px) saturate(180%);border:1.5px solid var(--gbrd);border-radius:24px;box-shadow:0 28px 80px rgba(0,0,0,.28);width:100%;max-width:580px;max-height:90vh;overflow-y:auto;animation:mPop .38s cubic-bezier(.34,1.56,.64,1);position:relative; }
+    .dossier-box { max-width:560px; }
     @keyframes mPop { from{opacity:0;transform:scale(.9) translateY(22px)} to{opacity:1;transform:none} }
     .modal-rainbow { height:4px;background:linear-gradient(90deg,var(--P),var(--violet),var(--em));border-radius:24px 24px 0 0; }
     .modal-hd { display:flex;align-items:center;justify-content:space-between;padding:20px 26px;border-bottom:1px solid var(--brd); }
     .modal-hd-left { display:flex;align-items:center;gap:14px; }
-    .modal-ico { width:50px;height:50px;border-radius:15px;background:linear-gradient(135deg,var(--P),var(--violet));display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 8px 24px rgba(29,95,224,.38);animation:iconB 2s ease-in-out infinite; }
-    @keyframes iconB { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    .modal-ico { width:50px;height:50px;border-radius:15px;background:linear-gradient(135deg,var(--P),var(--violet));display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 8px 24px rgba(29,95,224,.38); }
     .modal-title { font-size:17px;font-weight:900;color:var(--txt); }
     .modal-sub { font-size:11.5px;color:var(--txt4);margin-top:3px; }
     .modal-x { width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1.5px solid var(--brd);display:flex;align-items:center;justify-content:center;color:var(--txt3);cursor:pointer;transition:all .2s; }
     .modal-x:hover { background:rgba(240,66,106,.1);color:var(--rose);border-color:rgba(240,66,106,.2);transform:rotate(90deg); }
-
-    /* Avatar preview */
     .modal-avatar-preview { display:flex;align-items:center;gap:16px;padding:16px 26px;background:linear-gradient(135deg,rgba(29,95,224,.06),rgba(124,58,237,.04));border-bottom:1px solid var(--brd); }
-    .map-av { width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;transition:background .3s;box-shadow:0 6px 20px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.2);flex-shrink:0; }
-    .map-name { font-size:15px;font-weight:800;color:var(--txt);letter-spacing:-.3px; }
+    .map-av { width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;box-shadow:0 6px 20px rgba(0,0,0,.18);flex-shrink:0; }
+    .map-name { font-size:15px;font-weight:800;color:var(--txt); }
     .map-id { font-size:11.5px;color:var(--txt4);font-weight:600;margin-top:3px; }
     .map-blood { display:inline-block;margin-top:6px;font-size:10px;font-weight:800;background:var(--P);color:white;padding:2px 9px;border-radius:99px; }
-
-    /* Form */
     .modal-body { padding:22px 26px;display:flex;flex-direction:column;gap:18px; }
     .form-section { display:flex;flex-direction:column;gap:13px; }
-    .form-section-title { display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:3px; }
-    .form-section-title svg { color:var(--P); }
+    .form-section-title { display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.09em; }
     .form-row-2 { display:grid;grid-template-columns:1fr 1fr;gap:13px; }
     .fg { display:flex;flex-direction:column;gap:5px; }
     .fl { font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.09em; }
     .fi-wrap { display:flex;align-items:center;padding:11px 14px;border-radius:12px;background:var(--Pl);border:1.5px solid var(--brd);color:var(--txt4);transition:all .22s; }
     .fi-wrap-icon { gap:9px; }
-    .fi-wrap:focus-within,.fi-focused { border-color:var(--P)!important;background:rgba(29,95,224,.06);box-shadow:0 0 0 4px rgba(29,95,224,.09);color:var(--P); }
+    .fi-wrap:focus-within,.fi-focused { border-color:var(--P)!important;background:rgba(29,95,224,.06);box-shadow:0 0 0 4px rgba(29,95,224,.09); }
     .fi { border:none;background:transparent;outline:none;font-size:13px;color:var(--txt2);width:100%;font-family:'Plus Jakarta Sans',sans-serif; }
     .fi::placeholder { color:var(--txt4); }
-    .fi option { background:var(--bg3); }
-    .form-error { display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;background:rgba(240,66,106,.08);border:1px solid rgba(240,66,106,.22);color:var(--rose);font-size:13px;font-weight:600;animation:fadeIn .2s ease; }
-
-    .modal-ft { display:flex;align-items:center;justify-content:space-between;padding:18px 26px;border-top:1px solid var(--brd);background:rgba(29,95,224,.02); }
+    .form-error { display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;background:rgba(240,66,106,.08);border:1px solid rgba(240,66,106,.22);color:var(--rose);font-size:13px;font-weight:600; }
+    .modal-ft { display:flex;align-items:center;justify-content:space-between;padding:18px 26px;border-top:1px solid var(--brd); }
     .modal-ft-req { font-size:11px;color:var(--txt4); }
     .modal-ft-btns { display:flex;gap:10px; }
     .btn-cancel { padding:11px 20px;border-radius:12px;background:var(--bg2);border:1.5px solid var(--brd);color:var(--txt3);font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s; }
     .btn-cancel:hover { border-color:rgba(240,66,106,.3);color:var(--rose); }
-    .btn-save { position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:9px;padding:11px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--P),var(--violet));color:white;font-size:13px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(29,95,224,.4);transition:all .25s cubic-bezier(.34,1.56,.64,1); }
+    .btn-save { position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:9px;padding:11px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--P),var(--violet));color:white;font-size:13px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(29,95,224,.4);transition:all .25s; }
     .btn-save:hover { transform:translateY(-2px);box-shadow:0 10px 30px rgba(29,95,224,.5); }
-    .btn-rdv { display:flex;align-items:center;gap:7px;padding:11px 20px;border-radius:12px;border:1.5px solid rgba(14,184,138,.3);background:rgba(14,184,138,.08);color:var(--em);font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .22s; }
-    .btn-rdv:hover { background:var(--em);color:white;border-color:var(--em);box-shadow:0 6px 20px rgba(14,184,138,.35); }
+    .btn-save-shine { position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transition:left .5s; }
+    .btn-save:hover .btn-save-shine { left:100%; }
 
-    /* Dossier modal */
+    /* DOSSIER MODAL */
     .dossier-av { width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:white;box-shadow:0 6px 18px rgba(0,0,0,.2); }
-    .dossier-body { padding:20px 26px;display:flex;flex-direction:column;gap:14px; }
-    .dossier-stats { display:flex;align-items:center;background:var(--Pl);border:1px solid var(--brd);border-radius:14px;padding:16px; }
-    .ds-stat { flex:1;text-align:center; }
-    .ds-val { font-size:26px;font-weight:900;color:var(--P);letter-spacing:-1.2px;line-height:1; }
-    .ds-lbl { font-size:10.5px;color:var(--txt4);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:.04em; }
-    .ds-sep { width:1px;height:38px;background:var(--brd2); }
-    .dossier-section-title { display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.09em; }
-    .dossier-ord-row { display:flex;align-items:center;gap:11px;padding:10px 13px;border-radius:12px;background:var(--Pl);border:1px solid var(--brd);transition:all .2s; }
+    .dossier-body { padding:20px 26px;display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto; }
+    .dossier-loading { text-align:center;padding:30px;color:var(--txt4);font-size:13px; }
+    .dossier-empty { font-size:13px;color:var(--txt4);text-align:center;padding:20px 0; }
+    .dossier-tab { display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:10px;border:1.5px solid var(--brd);background:var(--bg2);color:var(--txt3);font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s; }
+    .dossier-tab:hover { border-color:var(--P);color:var(--P); }
+    .dossier-tab-on { background:var(--Pl2);color:var(--P);border-color:rgba(29,95,224,.3); }
+    .dtab-count { font-size:10px;background:var(--Pl);color:var(--P);border-radius:99px;padding:1px 7px;font-weight:700; }
+    .dossier-ord-row { display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:12px;background:var(--Pl);border:1px solid var(--brd);transition:all .2s; }
     .dossier-ord-row:hover { background:rgba(29,95,224,.08);transform:translateX(3px); }
     .dossier-ord-dot { width:8px;height:8px;border-radius:50%;background:var(--P);flex-shrink:0;box-shadow:0 0 8px rgba(29,95,224,.5); }
     .dossier-ord-info { flex:1; }
     .dossier-ord-meds { font-size:13px;font-weight:700;color:var(--txt); }
     .dossier-ord-date { font-size:11px;color:var(--txt4);margin-top:2px; }
-    .dossier-empty { font-size:13px;color:var(--txt4);text-align:center;padding:16px 0; }
+    .ord-badge { padding:4px 10px;border-radius:99px;font-size:10px;font-weight:700;background:rgba(239,68,68,.08);color:#dc2626;border:1px solid rgba(239,68,68,.2); }
+    .ord-badge.ord-active { background:rgba(16,185,129,.1);color:#16a34a;border-color:rgba(16,185,129,.25); }
+    .dossier-upload { display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:11px;background:rgba(29,95,224,.06);border:1.5px dashed rgba(29,95,224,.3);color:var(--P);font-size:12.5px;font-weight:700;cursor:pointer;transition:all .2s; }
+    .dossier-upload:hover { background:rgba(29,95,224,.12);border-color:var(--P); }
+    .dossier-file-row { display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:12px;background:var(--Pl);border:1px solid var(--brd);transition:all .2s; }
+    .dossier-file-row:hover { background:rgba(29,95,224,.08);transform:translateX(3px); }
+    .dossier-file-ico { font-size:20px;flex-shrink:0; }
+    .dossier-file-info { flex:1; }
+    .dossier-file-name { font-size:13px;font-weight:700;color:var(--txt); }
+    .dossier-file-meta { font-size:11px;color:var(--txt4);margin-top:2px; }
+    .dossier-file-btn { padding:5px 13px;border-radius:8px;background:var(--Pl2);color:var(--P);border:1px solid rgba(29,95,224,.2);font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s; }
+    .dossier-file-btn:hover { background:var(--P);color:white; }
 
-    /* ══ TOAST ══ */
+    /* TOAST */
     .toast-notif { position:fixed;bottom:26px;right:26px;z-index:9999;display:flex;align-items:center;gap:12px;padding:15px 20px;border-radius:18px;background:var(--glass);backdrop-filter:blur(26px);border:1.5px solid var(--gbrd);box-shadow:0 14px 44px rgba(0,0,0,.22);animation:tIn .38s cubic-bezier(.34,1.56,.64,1);min-width:280px; }
     @keyframes tIn { from{opacity:0;transform:translateX(40px) scale(.93)} to{opacity:1;transform:none} }
-    .toast-ico-wrap { width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--P),var(--violet));display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;box-shadow:0 6px 18px rgba(29,95,224,.4); }
+    .toast-ico-wrap { width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--P),var(--violet));display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0; }
     .toast-title { font-size:13.5px;font-weight:700;color:var(--txt); }
     .toast-desc { font-size:11.5px;color:var(--txt4);margin-top:2px; }
 
-    @media (max-width:700px) { .pts-grid { grid-template-columns:1fr; } .form-row-2 { grid-template-columns:1fr; } }
+    @media (max-width:700px) { .pts-grid{grid-template-columns:1fr} .form-row-2{grid-template-columns:1fr} }
   `]
 })
 export class PatientsComponent {
-  dossier = inject(DossierService);
-  rdvSvc  = inject(RdvService);
-
-  selectedPt = signal<any>(null);
-  searchQ    = '';
+  dossier     = inject(DossierService);
+  rdvSvc      = inject(RdvService);
+  patientsSvc = inject(PatientsService);
+  docsSvc     = inject(DocumentsService);
+  http        = inject(HttpClient);
+  auth = inject(AuthService);
+  selectedPt  = signal<any>(null);
+  searchQ     = signal('');
   searchFocused = false;
-  viewMode   = signal<'grid' | 'list'>('grid');
-  showModal  = signal(false);
-  dossierPt  = signal<any>(null);
+  viewMode    = signal<'grid'|'list'>('grid');
+  showModal   = signal(false);
+  dossierPt   = signal<any>(null);
   focusedField = '';
-  formError  = signal('');
-
+  formError   = signal('');
   showActionToast = signal(false);
   actionToastMsg  = signal({ title: '', desc: '' });
 
-  readonly String = String; // expose for template
+  dossierTab     = signal<'ords'|'files'>('ords');
+  dossierOrds    = signal<any[]>([]);
+  dossierFiles   = signal<any[]>([]);
+  loadingDossier = signal(false);
 
+  readonly String = String;
   readonly bloodGroups = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
 
-  patients = signal<any[]>([
-    { id:'P001', ini:'KA', name:'Karim Ayoub',   patientId:'PAT-001', blood:'A+',  grad:'linear-gradient(135deg,#1d5fe0,#154dc8)', badgeClass:'badge-active',     badgeLbl:'Actif',  score:78, scoreColor:'#1d5fe0' },
-    { id:'P002', ini:'SB', name:'Sana Ben Ali',   patientId:'PAT-002', blood:'O+',  grad:'linear-gradient(135deg,#6366f1,#4f46e5)', badgeClass:'badge-confirmed', badgeLbl:'Suivi',  score:91, scoreColor:'#0eb88a' },
-    { id:'P003', ini:'MH', name:'Mohamed Hedi',   patientId:'PAT-003', blood:'B-',  grad:'linear-gradient(135deg,#0891b2,#0e7490)', badgeClass:'badge-active',     badgeLbl:'Actif',  score:65, scoreColor:'#f0a020' },
-    { id:'P004', ini:'FA', name:'Fatma Ayari',    patientId:'PAT-004', blood:'AB+', grad:'linear-gradient(135deg,#0eb88a,#0d9a76)', badgeClass:'badge-confirmed', badgeLbl:'Suivi',  score:88, scoreColor:'#0eb88a' },
-  ]);
-
   newPt = this.emptyPt();
-
-  emptyPt() { return { firstName: '', lastName: '', birthDate: '', blood: '', phone: '', email: '', address: '' }; }
-
+  emptyPt() { return { firstName:'', lastName:'', birthDate:'', blood:'', phone:'', email:'', address:'', password:'' }; }
   get newPtName() { return [this.newPt.firstName, this.newPt.lastName].filter(Boolean).join(' '); }
-  // expose computed name for avatar preview
-  get newPtObj() { return { ...this.newPt, name: this.newPtName }; }
 
-  // Make newPt.name reactive via getter
-  get newPt_() {
-    return { ...this.newPt, name: this.newPtName };
-  }
-
-  // ── Search (actually filters now) ─────────────────────────────────────────
   filteredPatients = computed(() => {
-    if (!this.searchQ.trim()) return this.patients();
-    const q = this.searchQ.toLowerCase().trim();
-    return this.patients().filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.patientId.toLowerCase().includes(q) ||
-      p.blood.toLowerCase().includes(q)
-    );
-  });
+  const list = this.patientsSvc.patients();
+  if (!this.searchQ().trim()) return list;
+  const q = this.searchQ().toLowerCase();
+  return list.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    p.patientId.toLowerCase().includes(q) ||
+    p.blood?.toLowerCase().includes(q)
+  );
+});
+clearSearch() { this.searchQ.set(''); this.searchFocused = false; }
 
-  onSearch() { /* computed auto-refreshes */ }
-  clearSearch() { this.searchQ = ''; this.searchFocused = false; }
-
+  onSearch() {}
+  
   togglePt(p: any) { this.selectedPt.set(this.selectedPt()?.id === p.id ? null : p); }
 
-  // ── Getters ───────────────────────────────────────────────────────────────
-  getRdvCount  = (id: string) => this.rdvSvc.getForPatient?.(id)?.length ?? 0;
-  getOrdCount  = (id: string) => this.dossier.getOrdonnancesForPatient?.(id)?.length ?? 0;
-  getFileCount = (id: string) => this.dossier.getFilesForPatient?.(id)?.length ?? 0;
-  getMedNames  = (meds: any[]) => meds.map(m => m.name).slice(0, 3).join(' · ');
+  getRdvCount  = (_id: string) => 0;
+  getOrdCount  = (id: string)  => this.dossier.getOrdonnancesForPatient?.(id)?.length ?? 0;
+  getFileCount = (id: string)  => this.dossier.getFilesForPatient?.(id)?.length ?? 0;
+  getMedNames  = (meds: any[]) => (meds ?? []).map((m: any) => m.name).slice(0, 3).join(' · ');
 
   getGrad(name: string): string {
     if (!name) return 'linear-gradient(135deg,#e2e9f8,#c8d5ee)';
@@ -688,74 +689,150 @@ export class PatientsComponent {
     return g[(name.charCodeAt(0) + (name.charCodeAt(name.length - 1) || 0)) % g.length];
   }
 
-  // ── Action buttons (functional) ─────────────────────────────────────────
-  actionRdv(p: any, e: Event) {
-    e.stopPropagation();
-    this.notify('Nouveau RDV', `Redirection vers les RDV de ${p.name}`);
-    // router.navigate(['/doctor/rdv']) if needed
+  getInitials(name: string): string {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   }
 
-  actionOrd(p: any, e: Event) {
+  async actionDelete(p: any, e: Event) {
     e.stopPropagation();
-    this.notify('Ordonnance', `Création d'une ordonnance pour ${p.name}`);
-    // router.navigate(['/doctor/ordonnances']) if needed
+    if (!confirm(`Supprimer ${p.name} ?`)) return;
+    const success = await this.patientsSvc.deletePatient(p.id);
+    if (success) this.notify('Supprimé', `${p.name} a été supprimé`);
+    else this.notify('Erreur', 'Suppression échouée');
+  }
+  async deleteDocForPatient(id: number) {
+  const ok = await this.docsSvc.delete(id);
+  if (ok) {
+    this.dossierFiles.update(f => f.filter(x => x.id !== id));
+    this.notify('Fichier supprimé', '');
+  }
+}
+
+ async openDossier(p: any, e: Event) {
+  e.stopPropagation();
+  this.dossierPt.set(p);
+  this.dossierTab.set(this.auth.isDoctor() ? 'ords' : 'files');
+  this.dossierOrds.set([]);
+  this.dossierFiles.set([]);
+  this.loadingDossier.set(true);
+  this.selectedPt.set(null);
+
+  const token = this.auth.getToken();
+  const headers = { headers: { Authorization: `Bearer ${token}` } };
+
+  // ✅ استعمل p.id مباشرة — هو نفس الـ patientId في الباكند
+  const pid = p.id?.toString() ?? '';
+  console.log('Opening dossier for pid:', pid);
+
+  try {
+    const [ords, files] = await Promise.all([
+      firstValueFrom(this.http.get<any[]>(
+        `http://localhost:5000/api/ordonnances/patient/${pid}`, headers
+      )),
+      firstValueFrom(this.http.get<any[]>(
+        `http://localhost:5000/api/documents/patient/${pid}`, headers
+      ))
+    ]);
+    this.dossierOrds.set(ords ?? []);
+    this.dossierFiles.set(files ?? []);
+    console.log('files loaded:', files);
+  } catch(err) {
+    console.error('error:', err);
   }
 
-  openDossier(p: any, e: Event) {
-    e.stopPropagation();
-    this.dossierPt.set(p);
-    this.selectedPt.set(null);
+  this.loadingDossier.set(false);
+}
+
+  closeDossier() {
+    this.dossierPt.set(null);
+    this.dossierOrds.set([]);
+    this.dossierFiles.set([]);
   }
 
-  // ── Modal ─────────────────────────────────────────────────────────────────
-  closeModal() { this.showModal.set(false); this.newPt = this.emptyPt(); this.formError.set(''); this.focusedField = ''; }
+async uploadDocForPatient(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file || !this.dossierPt()) return;
 
-  addPatient() {
-    const name = this.newPtName;
-    if (!this.newPt.firstName || !this.newPt.lastName) { this.formError.set('Le prénom et le nom sont obligatoires.'); return; }
-    if (!this.newPt.birthDate) { this.formError.set('La date de naissance est obligatoire.'); return; }
-    if (!this.newPt.blood) { this.formError.set('Le groupe sanguin est obligatoire.'); return; }
+  const p = this.dossierPt()!;
+  const token = this.auth.getToken();
+  const headers = { headers: { Authorization: `Bearer ${token}` } };
+
+  // ✅ جيب User.Id تاع المريض
+  let uploadId = p.id?.toString() ?? '';
+  try {
+    const u = await firstValueFrom(
+      this.http.get<any>(`http://localhost:5000/api/patients/${p.id}/user`, headers)
+    );
+    if (u?.id) uploadId = u.id.toString();
+  } catch {}
+
+  const doc = await this.docsSvc.upload(file, uploadId, 'doctor');
+  if (doc) {
+    this.dossierFiles.update(f => [doc, ...f]);
+    this.notify('Fichier envoyé !', file.name);
+  } else {
+    this.notify('Erreur', 'Impossible d\'envoyer le fichier.');
+  }
+  (event.target as HTMLInputElement).value = '';
+}
+
+  ngOnInit() {
+  this.patientsSvc.loadPatients();
+}
+  closeModal() {
+    this.showModal.set(false);
+    this.newPt = this.emptyPt();
     this.formError.set('');
-
-    const grads = [
-      'linear-gradient(135deg,#1d5fe0,#154dc8)',
-      'linear-gradient(135deg,#6366f1,#4f46e5)',
-      'linear-gradient(135deg,#0891b2,#0e7490)',
-      'linear-gradient(135deg,#0eb88a,#0d9a76)',
-      'linear-gradient(135deg,#ec4899,#db2777)',
-      'linear-gradient(135deg,#f59e0b,#d97706)',
-    ];
-    const newId = 'P' + String(this.patients().length + 1).padStart(3, '0');
-    this.patients.update(list => [...list, {
-      id:         newId,
-      ini:        name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
-      name,
-      patientId:  'PAT-' + String(this.patients().length + 1).padStart(3, '0'),
-      blood:      this.newPt.blood,
-      grad:       grads[this.patients().length % grads.length],
-      badgeClass: 'badge-active',
-      badgeLbl:   'Actif',
-      score:      Math.floor(Math.random() * 25) + 70,
-      scoreColor: '#1d5fe0',
-    }]);
-    this.closeModal();
-    this.notify('Patient ajouté !', `${name} a été enregistré avec succès.`);
+    this.focusedField = '';
   }
 
-  // ── Toast ─────────────────────────────────────────────────────────────────
+  async addPatient() {
+    if (!this.newPt.firstName || !this.newPt.lastName) {
+      this.formError.set('Prénom et nom obligatoires');
+      return;
+    }
+    if (!this.newPt.birthDate) {
+      this.formError.set('Date de naissance obligatoire');
+      return;
+    }
+    const success = await this.patientsSvc.createPatient({
+      firstName: this.newPt.firstName,
+      lastName:  this.newPt.lastName,
+      birthDate: this.newPt.birthDate,
+      blood:     this.newPt.blood,
+      phone:     this.newPt.phone,
+      email:     this.newPt.email,
+      address:   this.newPt.address,
+      password:  this.newPt.password
+    });
+    if (success) {
+      this.closeModal();
+      this.notify('Patient ajouté', `${this.newPtName} ajouté avec succès`);
+    }
+  }
+
   notify(title: string, desc: string) {
     this.actionToastMsg.set({ title, desc });
     this.showActionToast.set(true);
     setTimeout(() => this.showActionToast.set(false), 3200);
   }
-  getInitials(name: string): string {
-  if (!name) return '?';
-
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  async reloadFiles() {
+  this.dossierTab.set('files');
+  if (!this.dossierPt()) return;
+  const token = this.auth.getToken();
+  const pid = this.dossierPt()!.id?.toString() ?? '';
+  try {
+    const files = await firstValueFrom(
+      this.http.get<any[]>(
+        `http://localhost:5000/api/documents/patient/${pid}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+    );
+    this.dossierFiles.set(files ?? []);
+    console.log('reloaded files:', files);
+  } catch(err) {
+    console.error('reload error:', err);
+  }
 }
 }
