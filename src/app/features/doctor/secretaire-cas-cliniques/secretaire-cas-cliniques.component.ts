@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CasCliniquesService, CasClinique } from '../../../core/services/cas-cliniques.service';
 import { ThemeService } from '../../../core/services/theme.service';
-
+import { tap } from 'rxjs/operators';
 @Component({
   selector: 'app-secretaire-cas-cliniques',
   standalone: true,
@@ -85,7 +85,7 @@ import { ThemeService } from '../../../core/services/theme.service';
           (touchstart)="startDrag($event, cas, ctnr)">
           <!-- After -->
           <div class="img-layer img-after"
-            [style.background-image]="cas.afterImg ? 'url('+cas.afterImg+')' : 'none'"
+           [style.background-image]="cas.afterImg ? 'url(http://localhost:5000' + cas.afterImg + ')' : 'none'"
             [style.background]="!cas.afterImg ? 'linear-gradient(135deg,#059669,#047857)' : ''">
             @if (!cas.afterImg) {
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.5">
@@ -96,7 +96,7 @@ import { ThemeService } from '../../../core/services/theme.service';
           <!-- Before overlay -->
           <div class="img-before-overlay" [style.width]="cas.sliderPos+'%'">
             <div class="img-layer img-before"
-              [style.background-image]="cas.beforeImg ? 'url('+cas.beforeImg+')' : 'none'"
+              [style.background-image]="cas.beforeImg ? 'url(http://localhost:5000'+cas.beforeImg+')' : 'none'"
               [style.background]="!cas.beforeImg ? 'linear-gradient(135deg,#dc2626,#b91c1c)' : ''">
               @if (!cas.beforeImg) {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.5">
@@ -499,6 +499,8 @@ export class SecretaireCasCliniquesComponent {
   formError    = signal('');
   confirmDeleteId = signal<number | null>(null);
   tagsInput = '';
+  private beforeFile: File | null = null;
+private afterFile:  File | null = null;
 
   readonly filters = [
     { id:'tous',           label:'Tous les cas' },
@@ -545,41 +547,53 @@ export class SecretaireCasCliniquesComponent {
     inp.click();
   }
 
-  onFileChange(event: Event, which: 'before' | 'after') {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (which === 'before') this.form.beforeImg = e.target?.result as string;
-      else this.form.afterImg = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  }
+ onFileChange(event: Event, which: 'before' | 'after') {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if (which === 'before') {
+      this.form.beforeImg = e.target?.result as string;
+      this.beforeFile = file;
+    } else {
+      this.form.afterImg = e.target?.result as string;
+      this.afterFile = file;
+    }
+  };
+  reader.readAsDataURL(file);
+}
 
   submitForm() {
-    this.formError.set('');
-    if (!this.form.titre.trim())      { this.formError.set('Le titre est requis.'); return; }
-    if (!this.form.traitement.trim()) { this.formError.set('Le traitement est requis.'); return; }
-    if (!this.form.duree.trim())      { this.formError.set('La durée est requise.'); return; }
-    if (!this.form.beforeImg)         { this.formError.set('La photo AVANT est requise.'); return; }
-    if (!this.form.afterImg)          { this.formError.set('La photo APRÈS est requise.'); return; }
+  this.formError.set('');
+  if (!this.form.titre.trim())      { this.formError.set('Le titre est requis.'); return; }
+  if (!this.form.traitement.trim()) { this.formError.set('Le traitement est requis.'); return; }
+  if (!this.form.duree.trim())      { this.formError.set('La durée est requise.'); return; }
+  if (!this.beforeFile)             { this.formError.set('La photo AVANT est requise.'); return; }
+  if (!this.afterFile)              { this.formError.set('La photo APRÈS est requise.'); return; }
 
-    this.submitting.set(true);
-    const tags = this.tagsInput.split(',').map(t => t.trim()).filter(Boolean);
+  this.submitting.set(true);
+  const tags = this.tagsInput.split(',').map(t => t.trim()).filter(Boolean);
 
-    setTimeout(() => {
-      this.svc.add({ ...this.form, tags });
-      this.submitting.set(false);
-      this.closeModal();
-    }, 600);
-  }
-
+  this.svc.addWithFiles({ ...this.form, tags }, this.beforeFile, this.afterFile)
+    .subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.closeModal();
+        this.beforeFile = null;
+        this.afterFile  = null;
+      },
+      error: () => {
+        this.formError.set('Erreur lors de l\'enregistrement.');
+        this.submitting.set(false);
+      }
+    });
+}
   deleteCase(id: number) { this.confirmDeleteId.set(id); }
   confirmDelete() {
     const id = this.confirmDeleteId();
     if (id !== null) { this.svc.remove(id); this.confirmDeleteId.set(null); }
   }
-
+  
   formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
   }

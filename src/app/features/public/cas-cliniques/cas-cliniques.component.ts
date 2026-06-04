@@ -37,12 +37,12 @@ import { CasCliniquesService } from '../../../core/services/cas-cliniques.servic
               (mousedown)="startDrag($event, cas, container)"
               (touchstart)="startDrag($event, cas, container)">
               <div class="img-after"
-                [style.background-image]="cas.afterImg.startsWith('assets') ? 'url('+cas.afterImg+')' : 'url('+cas.afterImg+')'"
+                [style.background-image]="'url(http://localhost:5000'+cas.afterImg+')'"
                 style="background-size:cover;background-position:center;">
               </div>
               <div class="img-before-overlay" [style.width]="cas.sliderPos+'%'">
                 <div class="img-before"
-                  [style.background-image]="'url('+cas.beforeImg+')'"
+              [style.background-image]="'url(http://localhost:5000'+cas.beforeImg+')'"
                   style="background-size:cover;background-position:center;width:100%;height:100%;">
                 </div>
               </div>
@@ -178,7 +178,8 @@ export class CasCliniquesComponent {
   private isDragging = false;
   private currentCase: any = null;
   private currentContainer: HTMLElement | null = null;
-
+  private beforeFile: File | null = null;
+private afterFile:  File | null = null;
   startDrag(event: MouseEvent | TouchEvent, cas: any, container: HTMLElement) {
     event.preventDefault();
     this.isDragging = true; this.currentCase = cas; this.currentContainer = container;

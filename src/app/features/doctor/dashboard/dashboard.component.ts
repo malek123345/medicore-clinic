@@ -178,57 +178,7 @@ import { DataService } from '../../../core/services/data.service';
       </div>
 
       <!-- WEEK CHART — DOCTOR ONLY -->
-      @if (isDoctor()) {
-        <div class="glass-card chart-card">
-          <div class="card-hd">
-            <div class="card-hd-left">
-              <div class="card-icon chart-ico">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/>
-                  <line x1="6" y1="20" x2="6" y2="16"/>
-                </svg>
-              </div>
-              <div>
-                <div class="card-eye">Cette semaine</div>
-                <div class="card-title">Activité des patients</div>
-              </div>
-            </div>
-            <div class="chart-summary">
-              <div class="chart-total">{{ weekTotal() }}</div>
-              <div class="chart-total-lbl">RDV cette semaine</div>
-            </div>
-          </div>
-          <div class="activity-mini-stats">
-            @for (ms of miniStats; track ms.label) {
-              <div class="ms-item">
-                <div class="ms-dot" [style.background]="ms.color"></div>
-                <div class="ms-content">
-                  <div class="ms-val">{{ ms.val }}</div>
-                  <div class="ms-lbl">{{ ms.label }}</div>
-                </div>
-                <button class="ms-btn" [style.--btn-c]="ms.color">{{ ms.action }}</button>
-              </div>
-            }
-          </div>
-          <div class="week-chart">
-            @for (d of weekData; track d.day; let i = $index) {
-              <div class="wday-col">
-                <div class="wbar-area">
-                  <div class="wbar-tooltip">{{ d.count }} consultations</div>
-                  <div class="wbar"
-                    [class.today]="d.today"
-                    [style.height.%]="d.count / maxWeek() * 88"
-                    [style.animation-delay]="(0.2 + i * 0.08)+'s'">
-                    <div class="wbar-shine"></div>
-                  </div>
-                </div>
-                <div class="wday-lbl" [class.today]="d.today">{{ d.day }}</div>
-              </div>
-            }
-          </div>
-        </div>
-      }
-
+     
       <!-- ALL RDV TABLE -->
       <div class="glass-card table-card">
         <div class="card-hd">
@@ -377,107 +327,9 @@ import { DataService } from '../../../core/services/data.service';
         }
       </div>
 
-      <!-- ORDONNANCES — DOCTOR ONLY -->
-      @if (isDoctor()) {
-        <div class="glass-card">
-          <div class="card-hd">
-            <div class="card-hd-left">
-              <div class="card-icon presc-ico">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
-                </svg>
-              </div>
-              <div>
-                <div class="card-eye">Récentes</div>
-                <div class="card-title">Ordonnances</div>
-              </div>
-            </div>
-            <a routerLink="/doctor/ordonnances" class="pill-link">
-              Voir tout
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </a>
-          </div>
-          <div class="ord-list">
-            @for (ord of recentOrds(); track ord.id) {
-              <div class="ord-row">
-                <div class="ord-ico">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
-                  </svg>
-                </div>
-                <div class="ord-body">
-                  <div class="ord-name">{{ ord.patientName }}</div>
-                  <div class="ord-meta">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                    {{ ord.date }} · {{ ord.medications.length }} médicament(s)
-                  </div>
-                </div>
-                <span class="badge badge-confirmed">Active</span>
-              </div>
-            }
-            @if (recentOrds().length === 0) {
-              <div class="empty-st" style="padding:24px">
-                <div class="empty-ico">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
-                  </svg>
-                </div>
-                <p class="empty-title">Aucune ordonnance récente</p>
-              </div>
-            }
-          </div>
-        </div>
-      }
+      
 
-      <!-- CHECK-IN CARD — SECRETARY ONLY -->
-      @if (isSecretary()) {
-        <div class="glass-card">
-          <div class="card-hd">
-            <div class="card-hd-left">
-              <div class="card-icon" style="background:rgba(16,185,129,0.15);color:#10b981">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <polyline points="16 11 18 13 22 9"/>
-                </svg>
-              </div>
-              <div>
-                <div class="card-eye">Arrivées du jour</div>
-                <div class="card-title">Check-in patients</div>
-              </div>
-            </div>
-            <span class="det-chip">{{ todayRdvs().length }} attendu(s)</span>
-          </div>
-          <div class="rdv-list">
-            @for (rdv of todayRdvs(); track rdv.id; let i = $index) {
-              <div class="rdv-item" [style.animation-delay]="(i*0.08)+'s'">
-                <div class="rdv-av" [style.background]="rdv.grad">
-                  {{ rdv.patientName[0] }}{{ rdv.patientName.split(' ')[1]?.[0] ?? '' }}
-                </div>
-                <div class="rdv-body">
-                  <div class="rdv-name">{{ rdv.patientName }}</div>
-                  <div class="rdv-meta">
-                    <span class="rdv-tag">{{ rdv.time }}</span>
-                    <span class="rdv-tag">{{ rdv.type }}</span>
-                  </div>
-                </div>
-                <button class="checkin-btn" [class.checked]="rdv.status === 'confirmed'">
-                  {{ rdv.status === 'confirmed' ? '✓ Arrivé' : 'Check-in' }}
-                </button>
-              </div>
-            }
-            @if (todayRdvs().length === 0) {
-              <div class="empty-st" style="padding:24px">
-                <p class="empty-title">Aucun patient attendu</p>
-              </div>
-            }
-          </div>
-        </div>
-      }
+      
     </div>
 
     <!-- ══ RIGHT COL — DOCTOR ONLY ══ -->
@@ -776,7 +628,7 @@ import { DataService } from '../../../core/services/data.service';
               @for (c of casCases().slice(0, 3); track c.id) {
                 <div class="cas-preview-tile" (click)="openCasListModal()">
                   @if (c.afterImg || c.beforeImg) {
-                    <img [src]="c.afterImg || c.beforeImg" class="cas-preview-img" alt="">
+                    <img [src]="'http://localhost:5000' + (c.afterImg || c.beforeImg)" class="cas-preview-img" alt="">
                   } @else {
                     <div class="cas-preview-placeholder">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1028,7 +880,7 @@ import { DataService } from '../../../core/services/data.service';
                 <div class="ml-card-imgs">
                   <div class="ml-img-wrap">
                     @if (c.beforeImg) {
-                      <img [src]="c.beforeImg" class="ml-img" alt="Avant">
+                      <img [src]="'http://localhost:5000' + c.beforeImg" class="ml-img" alt="Avant">
                     } @else {
                       <div class="ml-img-ph">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1048,7 +900,7 @@ import { DataService } from '../../../core/services/data.service';
                   </div>
                   <div class="ml-img-wrap">
                     @if (c.afterImg) {
-                      <img [src]="c.afterImg" class="ml-img" alt="Après">
+                      <img [src]="'http://localhost:5000' + c.afterImg" class="ml-img" alt="Après">
                     } @else {
                       <div class="ml-img-ph">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1308,9 +1160,9 @@ import { DataService } from '../../../core/services/data.service';
     .tbl-filters { display:flex; gap:6px; }
     .filter-btn { font-size:11px; font-weight:700; padding:6px 13px; border-radius:8px; background:var(--Pl); border:1px solid var(--border); color:var(--txt3); cursor:pointer; transition:all .2s; font-family:'Outfit',sans-serif; }
     .filter-btn.active { background:var(--P); color:white; border-color:var(--P); }
-    .tbl-wrap { overflow-x:auto; }
+    .tbl-wrap { overflow-x:auto; overflow-y:auto; max-height:320px; }
     .tbl { width:100%; border-collapse:collapse; font-size:13px; font-family:'Outfit',sans-serif; }
-    .tbl thead th { padding:11px 16px; text-align:left; font-size:10px; font-weight:700; color:var(--txt4); text-transform:uppercase; letter-spacing:.08em; background:rgba(29,106,229,0.04); border-bottom:1px solid var(--border); }
+.tbl thead th { position:sticky; top:0; z-index:2; font-size:10px; font-weight:700; color:var(--txt4); text-transform:uppercase; letter-spacing:.08em; background:rgba(29,106,229,0.04); border-bottom:1px solid var(--border); }
     .tbl tbody tr { border-bottom:1px solid var(--border); transition:all .25s; animation:rowIn .4s cubic-bezier(0.34,1.56,0.64,1) both; }
     @keyframes rowIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
     .tbl tbody tr:hover { background:var(--Pl); }
@@ -1724,7 +1576,8 @@ export class DashboardComponent implements OnInit {
     { value: 'implantologie',  label: 'Implantologie',  color: '#17a2b8' },
     { value: 'chirurgie',      label: 'Chirurgie',      color: '#155f9a' },
   ] as const;
-
+  private beforeFile: File | null = null;
+private afterFile: File | null = null;
   form = {
     titre: '', description: '',
     categorie: 'parodontologie' as 'parodontologie' | 'implantologie' | 'chirurgie',
@@ -1757,35 +1610,47 @@ export class DashboardComponent implements OnInit {
   }
 
   onBeforeImage(event: any) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { this.form.beforeImg = reader.result as string; };
-    reader.readAsDataURL(file);
-  }
+  const file = event.target.files[0]; if (!file) return;
+  this.beforeFile = file;
+  const reader = new FileReader();
+  reader.onload = () => { this.form.beforeImg = reader.result as string; };
+  reader.readAsDataURL(file);
+}
 
-  onAfterImage(event: any) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { this.form.afterImg = reader.result as string; };
-    reader.readAsDataURL(file);
-  }
+onAfterImage(event: any) {
+  const file = event.target.files[0]; if (!file) return;
+  this.afterFile = file;
+  const reader = new FileReader();
+  reader.onload = () => { this.form.afterImg = reader.result as string; };
+  reader.readAsDataURL(file);
+}
 
   saveCas() {
-    if (!this.form.titre.trim() || !this.form.description.trim()) {
-      alert('Veuillez remplir le titre et la description'); return;
-    }
-    const payload = {
-      titre: this.form.titre, description: this.form.description,
-      categorie: this.form.categorie,
-      category: this.getCategoryLabel(this.form.categorie),
-      catColor: this.getCategoryColor(this.form.categorie),
-      traitement: this.form.traitement, duree: this.form.duree,
-      beforeImg: this.form.beforeImg, afterImg: this.form.afterImg, tags: this.form.tags
-    };
-    const current = this.selectedCas();
-    if (current) { this.casSvc.update(current.id, payload); this.closeForm(); this.showCasList.set(true); }
-    else         { this.casSvc.add(payload);                this.closeForm(); this.showCasList.set(true); }
+  if (!this.form.titre.trim() || !this.form.description.trim()) {
+    alert('Veuillez remplir le titre et la description'); return;
   }
+  const current = this.selectedCas();
+  const payload = {
+    titre: this.form.titre, description: this.form.description,
+    categorie: this.form.categorie,
+    category: this.getCategoryLabel(this.form.categorie),
+    catColor: this.getCategoryColor(this.form.categorie),
+    traitement: this.form.traitement, duree: this.form.duree,
+    beforeImg: this.form.beforeImg, afterImg: this.form.afterImg, tags: this.form.tags
+  };
+  if (current) {
+    this.casSvc.update(current.id, payload);
+    this.closeForm(); this.showCasList.set(true);
+  } else {
+    if (!this.beforeFile || !this.afterFile) {
+      alert('Les deux photos sont requises'); return;
+    }
+    this.casSvc.addWithFiles(payload, this.beforeFile, this.afterFile).subscribe({
+      next: () => { this.closeForm(); this.showCasList.set(true); this.beforeFile = null; this.afterFile = null; },
+      error: () => alert('Erreur lors de l\'enregistrement')
+    });
+  }
+}
 
   getCategoryLabel(cat: string): string {
     return ({ parodontologie:'Parodontologie', implantologie:'Implantologie', chirurgie:'Chirurgie' } as any)[cat] ?? 'Autre';
@@ -1794,9 +1659,11 @@ export class DashboardComponent implements OnInit {
     return ({ parodontologie:'#1b7fc4', implantologie:'#17a2b8', chirurgie:'#155f9a' } as any)[cat] ?? '#6366f1';
   }
   resetForm() {
-    this.selectedCas.set(null);
-    this.form = { titre:'', description:'', categorie:'parodontologie', traitement:'', duree:'', beforeImg:'', afterImg:'', tags:[] };
-  }
+  this.selectedCas.set(null);
+  this.beforeFile = null;
+  this.afterFile = null;
+  this.form = { titre:'', description:'', categorie:'parodontologie', traitement:'', duree:'', beforeImg:'', afterImg:'', tags:[] };
+}
   countCat(cat: string): number { return this.casSvc.cases().filter(c => c.categorie === cat).length; }
   getCatColor(c: string): string {
     return ({ parodontologie:'#1b7fc4', implantologie:'#17a2b8', chirurgie:'#155f9a' } as any)[c] ?? '#6366f1';
@@ -1869,7 +1736,7 @@ export class DashboardComponent implements OnInit {
     { label:'Nouveau RDV',     sub:'Planifier un rendez-vous', path:'/doctor/rdv',        color:'#1d6ae5', bg:'rgba(29,106,229,0.1)',  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>` },
     { label:'Ordonnance',      sub:'Créer une ordonnance',     path:'/doctor/ordonnances', color:'#8b5cf6', bg:'rgba(139,92,246,0.1)',  icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/></svg>` },
     { label:'Nouveau patient', sub:'Ajouter un dossier',       path:'/doctor/patients',    color:'#0891b2', bg:'rgba(8,145,178,0.1)',   icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>` },
-    { label:'Urgences',        sub:'Gérer les urgences',       path:'/doctor/urgences',    color:'#ef4444', bg:'rgba(239,68,68,0.1)',   icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` },
+   
   ];
 
   readonly secretaryActions = [

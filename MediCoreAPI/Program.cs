@@ -17,7 +17,6 @@ builder.Services.AddControllers()
     {
       options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -43,11 +42,9 @@ builder.Services.AddSwaggerGen(c =>
   });
 });
 
-// Database
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -62,8 +59,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
       };
-
-      // ✅ SignalR يحتاج token في query string
       options.Events = new JwtBearerEvents
       {
         OnMessageReceived = context =>
@@ -77,7 +72,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
       };
     });
 
-// CORS — لازم AllowCredentials مع SignalR
 builder.Services.AddCors(options =>
 {
   options.AddDefaultPolicy(policy =>
@@ -89,16 +83,12 @@ builder.Services.AddCors(options =>
   });
 });
 
-// Services
 builder.Services.AddScoped<JwtHelper>();
 builder.Services.AddScoped<NotificationService>();
-
-// SignalR
 builder.Services.AddSignalR();
 
 var app = builder.Build();
 
-// Seed
 using (var scope = app.Services.CreateScope())
 {
   var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -109,20 +99,13 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors();
-var wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-Directory.CreateDirectory(wwwrootPath);
-app.UseStaticFiles(new StaticFileOptions
-{
-  FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootPath),
-  RequestPath = ""
-});
 
-app.UseStaticFiles();
+// ✅ uploads folder
+var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+Directory.CreateDirectory(uploadsDir);
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
-// ✅ SignalR Hub
 app.MapHub<NotificationHub>("/hubs/notifications");
-
 app.Run();

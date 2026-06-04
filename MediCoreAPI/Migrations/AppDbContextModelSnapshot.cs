@@ -64,6 +64,43 @@ namespace MediCoreAPI.Migrations
                     b.ToTable("Appointments");
                 });
 
+            modelBuilder.Entity("MediCoreAPI.Models.CabinetSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Adresse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Horaires")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MatriculeFiscal")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Nom")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NumeroOrdre")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SiteWeb")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Telephone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CabinetSettings");
+                });
+
             modelBuilder.Entity("MediCoreAPI.Models.CasClinique", b =>
                 {
                     b.Property<int>("Id")

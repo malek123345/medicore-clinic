@@ -14,6 +14,7 @@ namespace MediCoreAPI.Data
     public DbSet<OrdonnanceMed> OrdonnanceMeds => Set<OrdonnanceMed>();
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<CasClinique> CasCliniques => Set<CasClinique>();
+    public DbSet<CabinetSettings> CabinetSettings { get; set; }
     public DbSet<WaitingList> WaitingList { get; set; }
     // ✅ جديد
     public DbSet<PatientDocument> PatientDocuments { get; set; }

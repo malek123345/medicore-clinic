@@ -997,11 +997,11 @@ export class PublicShellComponent {
   onScroll() { this.scrolled.set(window.scrollY > 30); }
 
   readonly horaires = [
-    { day:'Lun', hours:'09:00 – 19:00', closed:false },
-    { day:'Mar', hours:'09:00 – 19:00', closed:false },
-    { day:'Mer', hours:'09:00 – 19:00', closed:false },
-    { day:'Jeu', hours:'09:00 – 19:00', closed:false },
-    { day:'Ven', hours:'09:00 – 19:00', closed:false },
+    { day:'Lun', hours:'08:00 – 16:45', closed:false },
+    { day:'Mar', hours:'08:00 – 16:45', closed:false },
+    { day:'Mer', hours:'08:00 – 16:45', closed:false },
+    { day:'Jeu', hours:'08:00 – 16:45', closed:false },
+    { day:'Ven', hours:'08:00 – 16:45', closed:false },
     { day:'Sam', hours:'08:00 – 14:00', closed:false },
     { day:'Dim', hours:'Fermé',          closed:true  },
   ];

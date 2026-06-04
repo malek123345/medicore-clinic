@@ -28,7 +28,49 @@ import { AuthService } from '../../../core/services/auth.service';
     <div class="cross-float cf2">✚</div>
     <div class="cross-float cf3">✚</div>
   </div>
-
+@if (confirmDeletePt()) {
+  <div class="modal-veil" (click)="confirmDeletePt.set(null)">
+    <div class="modal-box" style="max-width:420px" (click)="$event.stopPropagation()">
+      <div class="modal-rainbow" style="background:linear-gradient(90deg,#ef4444,#dc2626)"></div>
+      <div class="modal-hd">
+        <div class="modal-hd-left">
+          <div class="modal-ico" style="background:linear-gradient(135deg,#ef4444,#dc2626)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            </svg>
+          </div>
+          <div>
+            <div class="modal-title">Supprimer le patient</div>
+            <div class="modal-sub">Cette action est irréversible</div>
+          </div>
+        </div>
+        <button class="modal-x" (click)="confirmDeletePt.set(null)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="padding:24px 26px;text-align:center">
+        <div class="pt-av" style="width:60px;height:60px;border-radius:16px;font-size:18px;font-weight:800;color:white;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"
+          [style.background]="confirmDeletePt()!.grad">
+          {{ confirmDeletePt()!.ini }}
+        </div>
+        <div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:8px">
+          {{ confirmDeletePt()!.name }}
+        </div>
+        <div style="font-size:13px;color:var(--txt4);margin-bottom:24px">
+          Voulez-vous vraiment supprimer ce patient ? Son compte et toutes ses données seront supprimés définitivement.
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="btn-cancel" (click)="confirmDeletePt.set(null)">Annuler</button>
+          <button class="btn-save" style="background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 6px 20px rgba(239,68,68,.4)" (click)="doDelete()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            Supprimer définitivement
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
   <!-- ══ MODAL NOUVEAU PATIENT ══ -->
   @if (showModal()) {
     <div class="modal-veil" (click)="closeModal()">
@@ -278,11 +320,12 @@ import { AuthService } from '../../../core/services/auth.service';
     <div class="search-wrap" [class.search-on]="searchFocused">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input class="search-inp"
-        [ngModel]="searchQ()" (ngModelChange)="searchQ.set($event)"
-        (ngModelChange)="onSearch()"
-        (focus)="searchFocused=true"
-        (blur)="searchFocused=false"
-        placeholder="Rechercher un patient par nom..."/>
+  [ngModel]="searchQ()"
+  (ngModelChange)="searchQ.set($event)"
+  (focus)="searchFocused=true"
+  (blur)="searchFocused=false"
+  placeholder="Rechercher un patient par nom..."
+/>
      @if (searchQ()) {
         <button class="search-clr" (click)="clearSearch()">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -655,19 +698,22 @@ export class PatientsComponent {
   emptyPt() { return { firstName:'', lastName:'', birthDate:'', blood:'', phone:'', email:'', address:'', password:'' }; }
   get newPtName() { return [this.newPt.firstName, this.newPt.lastName].filter(Boolean).join(' '); }
 
-  filteredPatients = computed(() => {
-  const list = this.patientsSvc.patients();
-  if (!this.searchQ().trim()) return list;
-  const q = this.searchQ().toLowerCase();
-  return list.filter(p =>
-    p.name.toLowerCase().includes(q) ||
-    p.patientId.toLowerCase().includes(q) ||
-    p.blood?.toLowerCase().includes(q)
-  );
+ filteredPatients = computed(() => {
+  const list = this.patientsSvc.patients() || [];
+  const q = this.searchQ().toLowerCase().trim();
+
+  if (!q) return list;
+
+  return list.filter((p: any) => {
+    const fullName =
+      `${p.firstName ?? ''} ${p.lastName ?? ''}`.toLowerCase().trim();
+
+    return fullName.includes(q);
+  });
 });
 clearSearch() { this.searchQ.set(''); this.searchFocused = false; }
 
-  onSearch() {}
+
   
   togglePt(p: any) { this.selectedPt.set(this.selectedPt()?.id === p.id ? null : p); }
 
@@ -694,13 +740,21 @@ clearSearch() { this.searchQ.set(''); this.searchFocused = false; }
     return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   }
 
-  async actionDelete(p: any, e: Event) {
-    e.stopPropagation();
-    if (!confirm(`Supprimer ${p.name} ?`)) return;
-    const success = await this.patientsSvc.deletePatient(p.id);
-    if (success) this.notify('Supprimé', `${p.name} a été supprimé`);
-    else this.notify('Erreur', 'Suppression échouée');
-  }
+  confirmDeletePt = signal<any>(null);
+
+async actionDelete(p: any, e: Event) {
+  e.stopPropagation();
+  this.confirmDeletePt.set(p);
+}
+
+async doDelete() {
+  const p = this.confirmDeletePt();
+  if (!p) return;
+  this.confirmDeletePt.set(null);
+  const success = await this.patientsSvc.deletePatient(p.id);
+  if (success) this.notify('Supprimé', `${p.name} a été supprimé`);
+  else this.notify('Erreur', 'Suppression échouée');
+}
   async deleteDocForPatient(id: number) {
   const ok = await this.docsSvc.delete(id);
   if (ok) {

@@ -4,10 +4,10 @@
     "\\Controllers",
     "\\Data",
     "\\DTOs",
-    "\\Migrations",
+    "\\Hubs",
     "\\Models",
-    "\\Properties"
+    "\\Properties",
+    "\\Services"
   ],
-  "SelectedNode": "\\Models\\Patient.cs",
   "PreviewInSolutionExplorer": false
 }

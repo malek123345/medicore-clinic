@@ -20,26 +20,38 @@ namespace MediCoreAPI.Services
 
     private async Task<string?> GetUserEmail(string userId)
     {
-      if (!int.TryParse(userId, out var uid))
+      Console.WriteLine($"GET EMAIL FOR: {userId}");
+
+      // 1) نحاول Users أولاً
+      if (int.TryParse(userId, out var uid))
       {
-        Console.WriteLine($"GetUserEmail: invalid userId={userId}");
-        return null;
-      }
-      var user = await _db.Users.FindAsync(uid);
-      Console.WriteLine($"GetUserEmail: uid={uid}, email={user?.Email ?? "NULL"}");
-      if (!string.IsNullOrWhiteSpace(user?.Email))
-        return user.Email;
-      if (!string.IsNullOrWhiteSpace(user?.PatientId))
-      {
-        var patientIdNum = user.PatientId.Replace("PAT-", "").TrimStart('0');
-        if (int.TryParse(patientIdNum, out var pid))
+        var user = await _db.Users.FindAsync(uid);
+
+        if (user != null && !string.IsNullOrWhiteSpace(user.Email))
         {
-          var patient = await _db.Patients.FindAsync(pid);
-          Console.WriteLine($"GetUserEmail: patient email={patient?.Email ?? "NULL"}");
-          if (!string.IsNullOrWhiteSpace(patient?.Email))
-            return patient.Email;
+          Console.WriteLine($"EMAIL FROM USER: {user.Email}");
+          return user.Email;
+        }
+
+        // 2) fallback إلى patient
+        if (!string.IsNullOrWhiteSpace(user?.PatientId))
+        {
+          var clean = user.PatientId.Replace("PAT-", "").TrimStart('0');
+
+          if (int.TryParse(clean, out var pid))
+          {
+            var patient = await _db.Patients.FindAsync(pid);
+
+            if (patient != null && !string.IsNullOrWhiteSpace(patient.Email))
+            {
+              Console.WriteLine($"EMAIL FROM PATIENT: {patient.Email}");
+              return patient.Email;
+            }
+          }
         }
       }
+
+      Console.WriteLine("EMAIL NOT FOUND ❌");
       return null;
     }
 
@@ -70,12 +82,12 @@ namespace MediCoreAPI.Services
       var email = await GetUserEmail(userId);
       Console.WriteLine($"SendAsync: email={email ?? "NULL"}");
       if (email != null)
-        await _emailSvc.SendAsync(email, title,
+        _ = Task.Run(() => _emailSvc.SendAsync(email, title,
           $@"<div style='font-family:Arial;padding:20px;max-width:600px;margin:0 auto'>
             <h2 style='color:#1b7fc4'>Dr. Khaddar - MediCore</h2>
             <p style='font-size:16px;color:#333'>{message}</p>
             <p style='font-size:12px;color:#999'>Cabinet Dr. Zied Khaddar — MediCore</p>
-          </div>");
+          </div>"));
     }
 
     public async Task SendWithActionAsync(string userId, string title, string message, string type, string actionData)
@@ -104,10 +116,14 @@ namespace MediCoreAPI.Services
       });
 
       Console.WriteLine($"SendWithActionAsync: userId={userId}, title={title}");
+      Console.WriteLine("🔥 SEND NOTIF START");
+      Console.WriteLine($"🔥 USER ID = {userId}");
       var email = await GetUserEmail(userId);
+
       Console.WriteLine($"SendWithActionAsync: email={email ?? "NULL"}");
+      Console.WriteLine($"🔥 EMAIL FOUND = {email ?? "NULL"}");
       if (email != null)
-        await _emailSvc.SendAsync(email, title,
+        _ = Task.Run(() => _emailSvc.SendAsync(email, title,
           $@"<div style='font-family:Arial;padding:20px;max-width:600px;margin:0 auto'>
             <h2 style='color:#1b7fc4'>Dr. Khaddar - MediCore</h2>
             <p style='font-size:16px;color:#333'>{message}</p>
@@ -116,7 +132,7 @@ namespace MediCoreAPI.Services
               Confirmer maintenant
             </a>
             <p style='font-size:12px;color:#999'>Cabinet Dr. Zied Khaddar — MediCore</p>
-          </div>");
+          </div>"));
     }
   }
 }

@@ -216,9 +216,13 @@ import { PatientsService } from '../../../core/services/patients.service';
     </div>
     <div class="search-wrap">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input class="search-inp" [(ngModel)]="searchQ" placeholder="Rechercher un patient..."/>
-      @if (searchQ) {
-        <button class="search-clr" (click)="searchQ=''">
+      <input class="search-inp"
+  [ngModel]="searchQ()"
+  (ngModelChange)="searchQ.set($event)"
+  placeholder="Rechercher un patient..."
+/>
+     @if (searchQ()) {
+        <button class="search-clr" (click)="searchQ.set('')">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       }
@@ -272,22 +276,28 @@ import { PatientsService } from '../../../core/services/patients.service';
       </div>
     }
 
-    @if (filteredRdvs().length === 0) {
-      <div class="empty-card">
-        <div class="empty-ico">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="3" y="4" width="18" height="18" rx="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        </div>
-        <div class="empty-title">Aucun rendez-vous trouvé</div>
-        <div class="empty-sub">Essayez de modifier vos filtres ou créez un nouveau RDV</div>
-        @if (searchQ) {
-          <button class="btn-ghost-sm" (click)="searchQ=''">Effacer la recherche</button>
-        }
-      </div>
+  @if (filteredRdvs().length === 0) {
+  <div class="empty-card">
+    <div class="empty-ico">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    </div>
+
+    <div class="empty-title">Aucun rendez-vous trouvé</div>
+    <div class="empty-sub">Essayez de modifier vos filtres ou créez un nouveau RDV</div>
+
+    @if (searchQ()) {
+      <button class="btn-ghost-sm" (click)="searchQ.set('')">
+        Effacer la recherche
+      </button>
     }
+
+  </div>
+}
   </div>
 </div>
   `,
@@ -498,7 +508,7 @@ export class RdvComponent implements OnInit {
   rdvs = signal<any[]>([]);
   showAdd = signal(false);
   activeTab = signal('all');
-  searchQ = '';
+  searchQ = signal('');
 
   tabs = [
     { label: 'Tous', val: 'all', color: '#1d5fe0' },
@@ -543,21 +553,25 @@ export class RdvComponent implements OnInit {
   );
 
   // ===== FILTER =====
-  filteredRdvs = computed(() => {
-    let list = this.rdvs();
+ filteredRdvs = computed(() => {
+  let list = this.rdvs();
 
-    if (this.activeTab() !== 'all') {
-      list = list.filter(r => r.status === this.activeTab());
-    }
+  if (this.activeTab() !== 'all') {
+    list = list.filter(r => r.status === this.activeTab());
+  }
 
-    if (this.searchQ.trim()) {
-      list = list.filter(r =>
-        r.patientName.toLowerCase().includes(this.searchQ.toLowerCase())
-      );
-    }
+  const q = this.searchQ().toLowerCase().trim();
 
-    return list;
-  });
+  if (q) {
+    list = list.filter(r =>
+      r.patientName?.toLowerCase().includes(q) ||
+      r.patientPhone?.toLowerCase().includes(q) ||
+      r.type?.toLowerCase().includes(q)
+    );
+  }
+
+  return list;
+});
 
   // ===== HELPERS (FIX ERRORS) =====
 

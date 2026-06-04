@@ -1,6 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { tap } from 'rxjs/operators';
 
 export interface CasClinique {
   id: number;
@@ -56,6 +57,27 @@ export class CasCliniquesService {
       this._cases.update(list => [...list, res]);
     });
   }
+  addWithFiles(
+  cas: Omit<CasClinique, 'id' | 'sliderPos' | 'createdAt'>,
+  beforeFile: File,
+  afterFile: File
+) {
+  const fd = new FormData();
+  fd.append('categorie',   cas.categorie);
+  fd.append('category',    cas.category);
+  fd.append('catColor',    cas.catColor);
+  fd.append('titre',       cas.titre);
+  fd.append('description', cas.description);
+  fd.append('traitement',  cas.traitement);
+  fd.append('duree',       cas.duree);
+  cas.tags.forEach(t => fd.append('tags', t));
+  fd.append('beforeImg', beforeFile, beforeFile.name);
+  fd.append('afterImg',  afterFile,  afterFile.name);
+
+  return this.http.post<CasClinique>(this.API, fd).pipe(
+    tap(res => this._cases.update(list => [...list, res]))
+  );
+}
 
   remove(id: number): void {
     this.http.delete(`${this.API}/${id}`).subscribe(() => {
@@ -69,10 +91,17 @@ export class CasCliniquesService {
       this._cases.update(list => list.map(c => c.id === id ? res : c));
     });
   }
-
-  updateSlider(id: number, pos: number): void {
-    this.http.put<CasClinique>(`${this.API}/${id}/slider`, { sliderPos: pos }).subscribe(res => {
-      this._cases.update(list => list.map(c => c.id === id ? res : c));
-    });
-  }
+updateSlider(id: number, pos: number): void {
+  const token = localStorage.getItem('token');
+  const headers: { [header: string]: string } = token 
+    ? { Authorization: `Bearer ${token}` } 
+    : {};
+  this.http.put<CasClinique>(
+    `${this.API}/${id}/slider`,
+    { sliderPos: pos },
+    { headers }
+  ).subscribe(res => {
+    this._cases.update(list => list.map(c => c.id === id ? (res as CasClinique) : c));
+  });
+}
 }

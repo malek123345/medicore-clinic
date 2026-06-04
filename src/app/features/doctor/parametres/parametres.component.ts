@@ -694,7 +694,7 @@ export class ParametresComponent implements OnInit {
     if (!this.dp.old || !this.dp.new || this.dp.new !== this.dp.confirm) return;
     this.docSaving.set(true);
     try {
-      await firstValueFrom(this.http.put(`${this.API}/auth/change-password`, { userId: this.auth.user()?.id, currentPassword: this.dp.old, newPassword: this.dp.new }));
+     await firstValueFrom(this.http.put(`${this.API}/auth/me/password`, { currentPassword: this.dp.old, newPassword: this.dp.new }));
       this.dp = { old:'', new:'', confirm:'' }; this.dS.set(0);
       this.toast('Mot de passe mis à jour');
     } catch (e: any) { this.toast(e?.error?.message || 'Mot de passe actuel incorrect', true); }

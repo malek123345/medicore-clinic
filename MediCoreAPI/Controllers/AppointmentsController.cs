@@ -185,6 +185,7 @@ namespace MediCoreAPI.Controllers
       // 🔥 SMART CANCELLATION
       if (req.Status == "cancelled")
       {
+        Console.WriteLine("🔥 CANCEL RDV TRIGGERED");
         var date = appt.Date;
         var time = appt.Time;
 
@@ -199,20 +200,29 @@ namespace MediCoreAPI.Controllers
 
         if (waiting != null)
         {
-          waiting.IsNotified = true;
-
+          _db.WaitingList.Remove(waiting);
           await _db.SaveChangesAsync();
 
           var patientId = waiting.PatientId;
           var patientIdPadded = $"PAT-{waiting.PatientId.PadLeft(3, '0')}";
 
-          var waitingUser = await _db.Users.FirstOrDefaultAsync(u =>
-    u.PatientId != null &&
-    (
-        u.PatientId == waiting.PatientId ||
-        u.PatientId == $"PAT-{waiting.PatientId.PadLeft(3, '0')}" ||
-        u.PatientId.Replace("PAT-", "").TrimStart('0') == waiting.PatientId.TrimStart('0')
-    ));
+          var rawId = waiting.PatientId.Replace("PAT-", "").TrimStart('0');
+          if (string.IsNullOrEmpty(rawId)) rawId = "0";
+
+          Console.WriteLine($"🔍 WaitingList PatientId = '{waiting.PatientId}' | rawId = '{rawId}'");
+
+          var allPatients = await _db.Users.Where(u => u.Role == "Patient").ToListAsync();
+          foreach (var p in allPatients)
+            Console.WriteLine($"   👤 User Id={p.Id} | PatientId='{p.PatientId}' | Email={p.Email}");
+
+          var waitingUser = allPatients.FirstOrDefault(u =>
+              u.PatientId != null &&
+              (
+                  u.PatientId == waiting.PatientId ||
+                  u.PatientId == $"PAT-{waiting.PatientId.PadLeft(3, '0')}" ||
+                  u.PatientId.Replace("PAT-", "").TrimStart('0') == rawId ||
+                  u.Id.ToString() == rawId
+              ));
 
           if (waitingUser != null)
           {

@@ -166,6 +166,15 @@ namespace MediCoreAPI.Controllers
       var patient = await _db.Patients.FindAsync(id);
       if (patient == null) return NotFound();
 
+      // حذف User account كذلك
+      var padded = $"PAT-{id:D3}";
+      var user = await _db.Users.FirstOrDefaultAsync(u =>
+          u.PatientId == id.ToString() ||
+          u.PatientId == padded);
+
+      if (user != null)
+        _db.Users.Remove(user);
+
       _db.Patients.Remove(patient);
       await _db.SaveChangesAsync();
 

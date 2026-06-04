@@ -480,6 +480,7 @@ export class PatientRdvPublicComponent implements OnInit {
   }
 
   async addToWaitingList() {
+    
     const user = this.auth.user();
     if (!user) return;
 
